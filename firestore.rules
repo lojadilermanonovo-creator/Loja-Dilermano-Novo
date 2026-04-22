@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} { allow read, write: if false; }
+
+    // Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && request.auth.token.admin == true; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // Validation functions
+    function isValidProduct(p) {
+      return p.name is string && p.name.size() > 0 && p.name.size() <= 200 &&
+             p.price is number && p.price >= 0 &&
+             p.categoryId is string;
+    }
+
+    match /products/{id} {
+      allow read;
+      allow write: if isAdmin() && isValidProduct(request.resource.data);
+    }
+
+    match /categories/{id} {
+      allow read;
+      allow write: if isAdmin();
+    }
+
+    match /banners/{id} {
+      allow read;
+      allow write: if isAdmin();
+    }
+
+    match /promoBanner/{id} {
+      allow read;
+      allow write: if isAdmin();
+    }
+
+    match /coupons/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid) || isAdmin();
+
+      match /addresses/{aid} {
+        allow read, write: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    match /orders/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    match /reviews/{id} {
+      allow read: if resource.data.isApproved == true || isAdmin();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+    }
+
+    match /wishlists/{uid} {
+      allow read, write: if isOwner(uid);
+      match /items/{pid} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+  }
+}

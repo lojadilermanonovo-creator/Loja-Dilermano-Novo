@@ -1,0 +1,109 @@
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'motion/react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+const SLIDES = [
+  {
+    id: 1,
+    title: "Sua melhor versão começa aqui",
+    subtitle: "Coleção Outono/Inverno 2026 já disponível.",
+    imageUrl: "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80&w=2070&auto=format&fit=crop",
+    color: "bg-ocean"
+  },
+  {
+    id: 2,
+    title: "Estilo que inspira",
+    subtitle: "Peças exclusivas selecionadas para você.",
+    imageUrl: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2070&auto=format&fit=crop",
+    color: "bg-sunset"
+  }
+];
+
+export default function HeroCarousel() {
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % SLIDES.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleScrollToCategories = () => {
+    document.getElementById('categorias')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  return (
+    <div className="relative h-[600px] w-full overflow-hidden">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={current}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8 }}
+          className="absolute inset-0"
+        >
+          <div 
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${SLIDES[current].imageUrl})` }}
+          >
+            <div className="absolute inset-0 bg-black/40" />
+          </div>
+          
+          <div className="container mx-auto h-full px-4 relative z-10 flex flex-col justify-center">
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="max-w-2xl text-white space-y-6"
+            >
+              <h1 className="text-5xl md:text-7xl font-black tracking-tighter leading-none">
+                {SLIDES[current].title}
+              </h1>
+              <p className="text-xl md:text-2xl text-white/90">
+                {SLIDES[current].subtitle}
+              </p>
+              <div className="pt-4">
+                <Button 
+                  size="lg" 
+                  className="font-bold h-14 px-10 rounded-full text-lg shadow-xl"
+                  onClick={handleScrollToCategories}
+                >
+                  Comprar Agora
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+        {SLIDES.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrent(i)}
+            className={`h-1.5 transition-all duration-300 rounded-full ${
+              i === current ? 'w-8 bg-white' : 'w-2 bg-white/40'
+            }`}
+          />
+        ))}
+      </div>
+
+      <button 
+        onClick={() => setCurrent((prev) => (prev - 1 + SLIDES.length) % SLIDES.length)}
+        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 h-10 w-10 flex items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition-colors backdrop-blur-md"
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+
+      <button 
+        onClick={() => setCurrent((prev) => (prev + 1) % SLIDES.length)}
+        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 h-10 w-10 flex items-center justify-center rounded-full bg-black/20 text-white hover:bg-black/40 transition-colors backdrop-blur-md"
+      >
+        <ChevronRight className="h-6 w-6" />
+      </button>
+    </div>
+  );
+}

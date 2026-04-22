@@ -1,0 +1,1 @@
+{"version":3,"file":"onUserCreated.js","sourceRoot":"","sources":["../src/onUserCreated.ts"],"names":[],"mappings":";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;AAAA,iEAAmD;AAEtC,QAAA,aAAa,GAAG,SAAS,CAAC,IAAI,CAAC,IAAI,EAAE,CAAC,QAAQ,CAAC,KAAK,EAAE,IAAI,EAAE,EAAE;IACzE,OAAO,CAAC,GAAG,CAAC,mBAAmB,EAAE,IAAI,CAAC,GAAG,CAAC,CAAC;IAC3C,6CAA6C;AAC/C,CAAC,CAAC,CAAC"}
