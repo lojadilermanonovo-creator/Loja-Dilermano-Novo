@@ -1,6 +1,9 @@
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 
-export const calculateShipping = onCall({ region: "us-east1" }, async (request: CallableRequest) => {
+export const calculateShipping = onCall({ 
+  region: "us-east1",
+  cors: true
+}, async (request: CallableRequest) => {
   const { zipCode } = request.data;
   
   if (!zipCode) {

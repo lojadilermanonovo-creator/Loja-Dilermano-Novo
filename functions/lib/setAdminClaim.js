@@ -36,7 +36,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.setAdminClaim = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
-exports.setAdminClaim = (0, https_1.onCall)({ region: "us-east1" }, async (request) => {
+exports.setAdminClaim = (0, https_1.onCall)({
+    region: "us-east1",
+    cors: true
+}, async (request) => {
     const bootstrapEmail = "lojadilermanonovo@gmail.com";
     // Security check: only admins or the bootstrap email can promote users
     if (request.auth?.token.admin !== true && request.auth?.token.email !== bootstrapEmail) {

@@ -1,7 +1,10 @@
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 
-export const setAdminClaim = onCall({ region: "us-east1" }, async (request: CallableRequest) => {
+export const setAdminClaim = onCall({ 
+  region: "us-east1",
+  cors: true 
+}, async (request: CallableRequest) => {
   const bootstrapEmail = "lojadilermanonovo@gmail.com"; 
 
   // Security check: only admins or the bootstrap email can promote users

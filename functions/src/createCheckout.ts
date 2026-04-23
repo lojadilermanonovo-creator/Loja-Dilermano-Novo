@@ -6,7 +6,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2023-10-16" as any,
 });
 
-export const createCheckout = onCall({ region: "us-east1" }, async (request: CallableRequest) => {
+export const createCheckout = onCall({ 
+  region: "us-east1",
+  cors: true
+}, async (request: CallableRequest) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }
