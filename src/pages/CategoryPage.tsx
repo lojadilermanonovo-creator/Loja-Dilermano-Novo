@@ -19,58 +19,64 @@ export default function CategoryPage() {
       if (!id) return;
       setLoading(true);
       
-      let categoryData = null;
-      let productsQuery;
+      try {
+        let categoryData = null;
+        let productsQuery;
 
-      // Virtual Categories Handle
-      if (id === 'novidades') {
-        categoryData = { name: 'Novidades', description: 'Confira os últimos lançamentos da Dilermano.' };
-        productsQuery = query(
-          collection(db, 'products'),
-          where('isNew', '==', true),
-          where('isActive', '==', true),
-          orderBy('createdAt', 'desc')
-        );
-      } else if (id === 'promocoes') {
-        categoryData = { name: 'Promoções', description: 'As melhores ofertas selecionadas para você.' };
-        // Firestore doesn't support where price < originalPrice directly without complex queries
-        // or indexing if they are not fixed. We'll filter originalPrice exists and is higher.
-        // For simplicity in NoSQL, we normally have a isOnSale flag or we filter client side.
-        // Let's assume there's a isFeatured or just fetch all for now and filter.
-        productsQuery = query(
-          collection(db, 'products'),
-          where('isActive', '==', true)
-        );
-      } else if (id === 'destaques') {
-        categoryData = { name: 'Destaques', description: 'Os produtos mais procurados da nossa loja.' };
-        productsQuery = query(
-          collection(db, 'products'),
-          where('isFeatured', '==', true),
-          where('isActive', '==', true)
-        );
-      } else {
-        // Real Category
-        const categoryDoc = await getDoc(doc(db, 'categories', id));
-        if (categoryDoc.exists()) {
-          categoryData = { id: categoryDoc.id, ...(categoryDoc.data() as object) };
+        // Virtual Categories Handle
+        if (id === 'novidades') {
+          categoryData = { name: 'Novidades', description: 'Confira os últimos lançamentos da Dilermano.' };
+          productsQuery = query(
+            collection(db, 'products'),
+            where('isNew', '==', true),
+            where('isActive', '==', true),
+            orderBy('createdAt', 'desc')
+          );
+        } else if (id === 'promocoes') {
+          categoryData = { name: 'Promoções', description: 'As melhores ofertas selecionadas para você.' };
+          productsQuery = query(
+            collection(db, 'products'),
+            where('isActive', '==', true)
+          );
+        } else if (id === 'destaques') {
+          categoryData = { name: 'Destaques', description: 'Os produtos mais procurados da nossa loja.' };
+          productsQuery = query(
+            collection(db, 'products'),
+            where('isFeatured', '==', true),
+            where('isActive', '==', true)
+          );
+        } else {
+          // Real Category
+          const categoryDoc = await getDoc(doc(db, 'categories', id));
+          if (categoryDoc.exists()) {
+            categoryData = { id: categoryDoc.id, ...(categoryDoc.data() as object) };
+          }
+          productsQuery = query(
+            collection(db, 'products'),
+            where('categoryId', '==', id),
+            where('isActive', '==', true)
+          );
         }
-        productsQuery = query(
-          collection(db, 'products'),
-          where('categoryId', '==', id),
-          where('isActive', '==', true)
-        );
-      }
 
-      setCategory(categoryData);
-      const productsSnap = await getDocs(productsQuery);
-      let productsList = productsSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
-      
-      if (id === 'promocoes') {
-        productsList = productsList.filter(p => p.originalPrice && p.originalPrice > p.price);
+        setCategory(categoryData);
+        if (productsQuery) {
+          const productsSnap = await getDocs(productsQuery);
+          let productsList = productsSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+          
+          if (id === 'promocoes') {
+            productsList = productsList.filter(p => p.originalPrice && p.originalPrice > p.price);
+          }
+          setProducts(productsList);
+        }
+      } catch (err: any) {
+        if (err?.message?.includes('Database') && err?.message?.includes('not found')) {
+          console.warn("CategoryPage: Firestore database not found.");
+        } else {
+          console.error("CategoryPage: Error fetching data:", err);
+        }
+      } finally {
+        setLoading(false);
       }
-
-      setProducts(productsList);
-      setLoading(false);
     };
 
     fetchData();

@@ -15,35 +15,44 @@ export default function Index() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch active categories (max 6)
-      const categoriesQuery = query(
-        collection(db, 'categories'),
-        where('isActive', '==', true),
-        orderBy('sortOrder', 'asc'),
-        limit(6)
-      );
-      const categoriesSnap = await getDocs(categoriesQuery);
-      setCategories(categoriesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
+      try {
+        // Fetch active categories (max 6)
+        const categoriesQuery = query(
+          collection(db, 'categories'),
+          where('isActive', '==', true),
+          orderBy('sortOrder', 'asc'),
+          limit(6)
+        );
+        const categoriesSnap = await getDocs(categoriesQuery);
+        setCategories(categoriesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
 
-      // Fetch featured products
-      const featuredQuery = query(
-        collection(db, 'products'),
-        where('isFeatured', '==', true),
-        where('isActive', '==', true),
-        limit(8)
-      );
-      const featuredSnap = await getDocs(featuredQuery);
-      setFeaturedProducts(featuredSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
+        // Fetch featured products
+        const featuredQuery = query(
+          collection(db, 'products'),
+          where('isFeatured', '==', true),
+          where('isActive', '==', true),
+          limit(8)
+        );
+        const featuredSnap = await getDocs(featuredQuery);
+        setFeaturedProducts(featuredSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
 
-      // Fetch new products
-      const newQuery = query(
-        collection(db, 'products'),
-        where('isNew', '==', true),
-        where('isActive', '==', true),
-        limit(8)
-      );
-      const newSnap = await getDocs(newQuery);
-      setNewProducts(newSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
+        // Fetch new products
+        const newQuery = query(
+          collection(db, 'products'),
+          where('isNew', '==', true),
+          where('isActive', '==', true),
+          limit(8)
+        );
+        const newSnap = await getDocs(newQuery);
+        setNewProducts(newSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
+      } catch (err: any) {
+        // Check for "Database not found" specifically to avoid noisy errors
+        if (err?.message?.includes('Database') && err?.message?.includes('not found')) {
+          console.warn("Home: Firestore database not found yet.");
+        } else {
+          console.error("Home: Error fetching data:", err);
+        }
+      }
     };
 
     fetchData();

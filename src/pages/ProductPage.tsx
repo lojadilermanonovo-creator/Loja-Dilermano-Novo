@@ -26,26 +26,35 @@ export default function ProductPage() {
     const fetchProduct = async () => {
       if (!id) return;
       setLoading(true);
-      const productDoc = await getDoc(doc(db, 'products', id));
-      if (productDoc.exists()) {
-        const productData: any = { id: productDoc.id, ...(productDoc.data() as any) };
-        setProduct(productData);
+      try {
+        const productDoc = await getDoc(doc(db, 'products', id));
+        if (productDoc.exists()) {
+          const productData: any = { id: productDoc.id, ...(productDoc.data() as any) };
+          setProduct(productData);
 
-        // Fetch related products from same category
-        const relatedQuery = query(
-          collection(db, 'products'),
-          where('categoryId', '==', productData.categoryId),
-          where('isActive', '==', true),
-          limit(4)
-        );
-        const relatedSnap = await getDocs(relatedQuery);
-        setRelatedProducts(
-          relatedSnap.docs
-            .map(doc => ({ id: doc.id, ...(doc.data() as any) }))
-            .filter(p => p.id !== id)
-        );
+          // Fetch related products from same category
+          const relatedQuery = query(
+            collection(db, 'products'),
+            where('categoryId', '==', productData.categoryId),
+            where('isActive', '==', true),
+            limit(4)
+          );
+          const relatedSnap = await getDocs(relatedQuery);
+          setRelatedProducts(
+            relatedSnap.docs
+              .map(doc => ({ id: doc.id, ...(doc.data() as any) }))
+              .filter(p => p.id !== id)
+          );
+        }
+      } catch (err: any) {
+        if (err?.message?.includes('Database') && err?.message?.includes('not found')) {
+          console.warn("ProductPage: Firestore database not found.");
+        } else {
+          console.error("ProductPage: Error fetching data:", err);
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchProduct();

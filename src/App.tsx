@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/src/contexts/AuthContext';
 import { CartProvider } from '@/src/contexts/CartContext';
+import { DatabaseStatusProvider } from '@/src/contexts/DatabaseStatusContext';
 import { Toaster } from 'sonner';
 
 // Pages
@@ -53,43 +54,45 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <CartProvider>
-          <Router>
-            <Routes>
-              {/* Store Routes */}
-              <Route element={<StoreLayout />}>
-                <Route path="/" element={<Index />} />
-                <Route path="/categoria/:id" element={<CategoryPage />} />
-                <Route path="/produto/:id" element={<ProductPage />} />
-                <Route path="/carrinho" element={<CartPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="/checkout/success" element={<CheckoutSuccess />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                
-                <Route element={<ProtectedRoute />}>
-                  <Route path="/conta" element={<MyAccount />} />
-                  <Route path="/meus-pedidos" element={<MyOrders />} />
+        <DatabaseStatusProvider>
+          <CartProvider>
+            <Router>
+              <Routes>
+                {/* Store Routes */}
+                <Route element={<StoreLayout />}>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/categoria/:id" element={<CategoryPage />} />
+                  <Route path="/produto/:id" element={<ProductPage />} />
+                  <Route path="/carrinho" element={<CartPage />} />
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/checkout/success" element={<CheckoutSuccess />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  
+                  <Route element={<ProtectedRoute />}>
+                    <Route path="/conta" element={<MyAccount />} />
+                    <Route path="/meus-pedidos" element={<MyOrders />} />
+                  </Route>
+                  
+                  <Route path="*" element={<NotFound />} />
                 </Route>
-                
-                <Route path="*" element={<NotFound />} />
-              </Route>
 
-              {/* Admin Routes */}
-              <Route element={<ProtectedRoute adminOnly />}>
-                <Route element={<AdminLayout />}>
-                  <Route path="/admin" element={<AdminDashboard />} />
-                  <Route path="/admin/produtos" element={<AdminProducts />} />
-                  <Route path="/admin/categorias" element={<AdminCategories />} />
-                  <Route path="/admin/pedidos" element={<AdminOrders />} />
+                {/* Admin Routes */}
+                <Route element={<ProtectedRoute adminOnly />}>
+                  <Route element={<AdminLayout />}>
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/produtos" element={<AdminProducts />} />
+                    <Route path="/admin/categorias" element={<AdminCategories />} />
+                    <Route path="/admin/pedidos" element={<AdminOrders />} />
+                  </Route>
                 </Route>
-              </Route>
-            </Routes>
-            <Toaster position="top-right" richColors />
-          </Router>
-        </CartProvider>
+              </Routes>
+              <Toaster position="top-right" richColors />
+            </Router>
+          </CartProvider>
+        </DatabaseStatusProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

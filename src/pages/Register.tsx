@@ -25,14 +25,23 @@ export default function Register() {
 
       await updateProfile(user, { displayName: name });
       
-      // Create user document in Firestore
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
-        email: user.email,
-        fullName: name,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      try {
+        // Create user document in Firestore
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          email: user.email,
+          fullName: name,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (dbErr: any) {
+        // Log the error but don't stop the registration flow
+        if (dbErr?.message?.includes('Database') && dbErr?.message?.includes('not found')) {
+          console.warn("Register: Profile doc not created because Firestore is not configured yet.");
+        } else {
+          console.error("Register: Error creating profile doc:", dbErr);
+        }
+      }
 
       toast.success('Conta criada com sucesso!');
       navigate('/');
