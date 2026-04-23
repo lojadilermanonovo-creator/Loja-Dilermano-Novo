@@ -7,6 +7,7 @@ import { Toaster } from 'sonner';
 
 // Pages
 import Index from '@/src/pages/Index';
+import AdminInit from '@/src/pages/AdminInit';
 import CategoryPage from '@/src/pages/CategoryPage';
 import ProductPage from '@/src/pages/ProductPage';
 import CartPage from '@/src/pages/CartPage';
@@ -61,6 +62,7 @@ export default function App() {
                 {/* Store Routes */}
                 <Route element={<StoreLayout />}>
                   <Route path="/" element={<Index />} />
+                  <Route path="/initialize-admin" element={<AdminInit />} />
                   <Route path="/categoria/:id" element={<CategoryPage />} />
                   <Route path="/produto/:id" element={<ProductPage />} />
                   <Route path="/carrinho" element={<CartPage />} />
