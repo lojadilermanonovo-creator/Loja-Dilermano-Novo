@@ -23,8 +23,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
-        const tokenResult = await getIdTokenResult(user);
-        setIsAdmin(!!tokenResult.claims.admin);
+        const isMasterEmail = user.email === 'lojadilermanonovo@gmail.com';
+        setIsAdmin(isMasterEmail);
       } else {
         setIsAdmin(false);
       }

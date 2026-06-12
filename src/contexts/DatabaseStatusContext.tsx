@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '@/src/integrations/firebase/client';
 import { doc, getDocFromServer } from 'firebase/firestore';
