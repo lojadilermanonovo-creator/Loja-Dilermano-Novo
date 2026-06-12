@@ -3,10 +3,10 @@ import { db } from '@/src/integrations/firebase/client';
 import { collection, query, getDocs, deleteDoc, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, FolderTree, Layers, ShieldCheck, EyeOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 
@@ -21,11 +21,18 @@ export default function AdminCategories() {
   const [imageUrl, setImageUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
 
+  // Stats
+  const [activeCount, setActiveCount] = useState(0);
+
   const fetchCategories = async () => {
     setLoading(true);
     try {
       const snap = await getDocs(collection(db, 'categories'));
-      setCategories(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      // Sort locally by sortOrder
+      list.sort((a,b) => (a.sortOrder || 1) - (b.sortOrder || 1));
+      setCategories(list);
+      setActiveCount(list.filter(c => c.isActive).length);
     } catch (error) {
       toast.error('Erro ao buscar categorias');
     } finally {
@@ -40,7 +47,7 @@ export default function AdminCategories() {
   const handleOpenDialog = (category?: any) => {
     if (category) {
       setSelectedCategory(category);
-      setName(category.name);
+      setName(category.name || '');
       setImageUrl(category.imageUrl || '');
       setIsActive(category.isActive ?? true);
     } else {
@@ -53,7 +60,10 @@ export default function AdminCategories() {
   };
 
   const handleSave = async () => {
-    if (!name) return;
+    if (!name) {
+      toast.error('Por favor, informe o nome para a nova categoria');
+      return;
+    }
     try {
       const data = {
         name,
@@ -63,12 +73,19 @@ export default function AdminCategories() {
       };
 
       if (selectedCategory) {
+        // Edit flow
+        const activeCountExcludingMe = categories.filter(c => c.isActive && c.id !== selectedCategory.id).length;
+        if (isActive && activeCountExcludingMe >= 6) {
+          toast.error('O sistema permite no máximo 6 categorias ativas em exibição');
+          return;
+        }
+
         await updateDoc(doc(db, 'categories', selectedCategory.id), data);
-        toast.success('Categoria atualizada');
+        toast.success('Categoria atualizada com sucesso');
       } else {
-        const activeCount = categories.filter(c => c.isActive).length;
+        // Create flow
         if (isActive && activeCount >= 6) {
-           toast.error('Máximo de 6 categorias ativas permitido');
+           toast.error('Limite excedido! Limite de 6 categorias ativas permitido.');
            return;
         }
         await setDoc(doc(collection(db, 'categories')), {
@@ -76,7 +93,7 @@ export default function AdminCategories() {
           createdAt: serverTimestamp(),
           sortOrder: categories.length + 1
         });
-        toast.success('Categoria criada');
+        toast.success('Categoria adicionada ao catálogo');
       }
       fetchCategories();
       setIsDialogOpen(false);
@@ -86,93 +103,212 @@ export default function AdminCategories() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Excluir esta categoria?')) return;
+    if (!confirm('Deseja realmente remover esta categoria? Produtos vinculados a ela não serão excluídos.')) return;
     try {
       await deleteDoc(doc(db, 'categories', id));
-      toast.success('Categoria excluída');
+      toast.success('Categoria excluída com sucesso');
       fetchCategories();
     } catch (error) {
-      toast.error('Erro ao excluir');
+      toast.error('Erro ao excluir categoria');
     }
   };
 
   return (
-    <div className="space-y-8 p-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 p-6 md:p-10 max-w-7xl mx-auto">
+      {/* Page Title & actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200">
         <div>
-          <h1 className="text-3xl font-black tracking-tighter uppercase">Categorias</h1>
-          <p className="text-muted-foreground">Máximo de 6 categorias ativas no site.</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 uppercase">
+            Categorias do Site
+          </h1>
+          <p className="text-slate-500 mt-1">
+            Organize seus produtos. No máximo 6 categorias ativas aparecem na vitrine do seu site.
+          </p>
         </div>
-        <Button className="bg-ocean hover:bg-ocean/90 rounded-xl gap-2 font-bold" onClick={() => handleOpenDialog()}>
-          <Plus className="h-4 w-4" /> Nova Categoria
+        <Button 
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl gap-2 h-11 px-6 cursor-pointer shadow-lg shadow-blue-500/10" 
+          onClick={() => handleOpenDialog()}
+        >
+          <Plus className="h-4.5 w-4.5" /> Adicionar Categoria
         </Button>
       </div>
 
-      <div className="border rounded-2xl overflow-hidden bg-card">
+      {/* Quick Category Stats metrics info */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center gap-4">
+          <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <FolderTree className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Categorias Cadastradas</span>
+            <span className="text-xl font-bold text-slate-800">{loading ? '...' : categories.length}</span>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center gap-4">
+          <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Ativas (Lim. 6)</span>
+            <span className="text-xl font-extrabold text-emerald-600">{loading ? '...' : `${activeCount}/6`}</span>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex items-center gap-4">
+          <div className="h-10 w-10 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center shrink-0">
+            <EyeOff className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Inativas</span>
+            <span className="text-xl font-bold text-slate-800">{loading ? '...' : categories.length - activeCount}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Categories datagrid list */}
+      <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Preview</TableHead>
-              <TableHead>Nome</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+          <TableHeader className="bg-slate-50 border-b border-slate-200">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[100px] pl-6 font-bold text-slate-700 py-4">Preview</TableHead>
+              <TableHead className="font-bold text-slate-700 py-4">Nome da Categoria</TableHead>
+              <TableHead className="font-bold text-slate-700 py-4">ID de Referência</TableHead>
+              <TableHead className="font-bold text-slate-700 py-4">Status de Exibição</TableHead>
+              <TableHead className="font-bold text-slate-700 py-4 text-right pr-6">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={4} className="text-center">Carregando...</TableCell></TableRow>
-            ) : categories.map((cat) => (
-              <TableRow key={cat.id}>
-                <TableCell>
-                   <img src={cat.imageUrl} className="h-10 w-10 rounded-lg object-cover" alt="" />
-                </TableCell>
-                <TableCell className="font-bold">{cat.name}</TableCell>
-                <TableCell>
-                   <Badge variant={cat.isActive ? 'default' : 'secondary'}>
-                     {cat.isActive ? 'Ativa' : 'Inativa'}
-                   </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                   <div className="flex justify-end gap-2">
-                     <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(cat)}><Pencil className="h-4 w-4" /></Button>
-                     <Button variant="ghost" size="icon" className="text-sunset" onClick={() => handleDelete(cat.id)}><Trash2 className="h-4 w-4" /></Button>
-                   </div>
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-20 text-slate-400 text-sm">
+                  Carregando coleções de categorias...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : categories.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-20 text-slate-400 text-sm">
+                  Nenhuma categoria registrada no banco de dados.
+                </TableCell>
+              </TableRow>
+            ) : (
+              categories.map((cat) => (
+                <TableRow key={cat.id} className="hover:bg-slate-50/40 transition-colors">
+                  <TableCell className="pl-6 py-4">
+                    <div className="h-12 w-12 rounded-xl overflow-hidden border border-slate-100 bg-slate-150">
+                      <img 
+                        src={cat.imageUrl || "https://placehold.co/100x100?text=Sem+Foto"} 
+                        className="h-full w-full object-cover" 
+                        alt={cat.name} 
+                      />
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="py-4 font-bold text-slate-900 text-sm">
+                    {cat.name}
+                  </TableCell>
+
+                  <TableCell className="py-4 text-xs font-mono text-slate-400">
+                    {cat.id}
+                  </TableCell>
+
+                  <TableCell className="py-4">
+                    <Badge 
+                      variant={cat.isActive ? 'default' : 'secondary'}
+                      className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold ${
+                        cat.isActive 
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-250 hover:bg-emerald-50' 
+                          : 'bg-slate-50 text-slate-400 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {cat.isActive ? 'Ativa' : 'Inativa'}
+                    </Badge>
+                  </TableCell>
+
+                  <TableCell className="py-4 text-right pr-6">
+                    <div className="flex justify-end gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleOpenDialog(cat)}
+                        className="rounded-xl h-9 w-9 text-slate-500 hover:bg-slate-100 cursor-pointer"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="rounded-xl h-9 w-9 text-rose-500 hover:bg-rose-50 hover:text-rose-600 cursor-pointer" 
+                        onClick={() => handleDelete(cat.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
 
+      {/* Category Editor modal drawer dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="rounded-[2.5rem]">
+        <DialogContent className="max-w-md rounded-2xl bg-white p-6">
           <DialogHeader>
-            <DialogTitle className="uppercase font-black tracking-tighter text-2xl">
-              {selectedCategory ? 'Editar Categoria' : 'Nova Categoria'}
+            <DialogTitle className="text-xl font-bold text-slate-900">
+              {selectedCategory ? 'Editar Categoria' : 'Nova Categoria de Prateleira'}
             </DialogTitle>
+            <DialogDescription>
+              Insira o nome amigável e uma URL de foto de alta resolução (ex: Unsplash) para compor a categoria.
+            </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4 py-4">
-             <div className="space-y-2">
-               <Label>Nome da Categoria</Label>
-               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Masculino" />
-             </div>
-             <div className="space-y-2">
-               <Label>URL da Imagem</Label>
-               <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
-             </div>
-             <div className="flex items-center gap-2">
-               <input 
-                 type="checkbox" 
-                 id="catActive" 
-                 checked={isActive} 
-                 onChange={(e) => setIsActive(e.target.checked)} 
-               />
-               <Label htmlFor="catActive">Categoria Ativa</Label>
-             </div>
+            <div className="space-y-2">
+              <Label htmlFor="cat-name" className="text-slate-700 font-semibold text-xs">Nome de Coleção</Label>
+              <Input 
+                id="cat-name" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+                placeholder="Ex: Coleção Masculina" 
+                className="rounded-xl border-slate-200 text-sm"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cat-url" className="text-slate-700 font-semibold text-xs">URL da Imagem Banner</Label>
+              <Input 
+                id="cat-url" 
+                value={imageUrl} 
+                onChange={(e) => setImageUrl(e.target.value)} 
+                placeholder="https://images.unsplash.com/photo-..." 
+                className="rounded-xl border-slate-200 text-sm"
+              />
+            </div>
+
+            <div className="flex items-center space-x-3 pt-1">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  id="cat-active"
+                  type="checkbox" 
+                  checked={isActive} 
+                  onChange={(e) => setIsActive(e.target.checked)} 
+                  className="sr-only peer" 
+                />
+                <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full.5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-blue-600"></div>
+                <span className="ml-3 text-xs font-semibold text-slate-700 cursor-pointer">Categoria Ativa na Vitrine</span>
+              </label>
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-            <Button className="bg-ocean hover:bg-ocean/90 font-bold" onClick={handleSave}>Salvar</Button>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl h-11 font-medium bg-white">
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 font-bold rounded-xl h-11 px-6 cursor-pointer text-white">
+              Salvar Categoria
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
