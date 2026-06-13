@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '@/src/integrations/firebase/client';
-import { collection, query, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, updateDoc, doc, runTransaction } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,31 +41,234 @@ export default function AdminOrders() {
     fetchOrders();
   }, []);
 
+  const restoreStock = async (orderId: string) => {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const orderRef = doc(db, 'orders', orderId);
+        const orderSnap = await transaction.get(orderRef);
+        
+        if (!orderSnap.exists()) {
+          throw new Error('Pedido não encontrado no banco de dados para devolução de estoque.');
+        }
+        
+        const orderData = orderSnap.data();
+        
+        // If stock was not deducted, nothing to restore
+        if (orderData.stockDeducted !== true) {
+          return;
+        }
+        
+        const items = orderData.items || [];
+        let auditWarning: string | null = null;
+        
+        for (const item of items) {
+          const productRef = doc(db, 'products', item.productId);
+          const productSnap = await transaction.get(productRef);
+          
+          if (!productSnap.exists()) {
+            // Found a deleted product! Mark warning but continue with others to not lock the UI
+            auditWarning = `Reconciliação parcial: O produto "${item.name}" (ID: ${item.productId}) foi excluído do catálogo, de modo que seu estoque correspondente não pôde ser devolvido.`;
+            continue;
+          }
+          
+          const productData = productSnap.data();
+          const quantityToRestore = Number(item.quantity) || 1;
+          
+          if (productData.variations && productData.variations.length > 0) {
+            const size = item.attributes?.Tamanho || item.attributes?.['Tamanho'];
+            const color = item.attributes?.Cor || item.attributes?.['Cor'];
+            
+            const varIdx = productData.variations.findIndex(
+              (v: any) => v.size === size && v.color === color
+            );
+            
+            if (varIdx !== -1) {
+              const currentVarStock = Number(productData.variations[varIdx].stockQuantity) || 0;
+              productData.variations[varIdx].stockQuantity = currentVarStock + quantityToRestore;
+              
+              const totalStock = productData.variations.reduce(
+                (sum: number, v: any) => sum + (Number(v.stockQuantity) || 0), 
+                0
+              );
+              
+              transaction.update(productRef, {
+                variations: productData.variations,
+                stockQuantity: totalStock
+              });
+            } else {
+              const currentBaseStock = Number(productData.stockQuantity) || 0;
+              transaction.update(productRef, {
+                stockQuantity: currentBaseStock + quantityToRestore
+              });
+            }
+          } else {
+            const currentBaseStock = Number(productData.stockQuantity) || 0;
+            transaction.update(productRef, {
+              stockQuantity: currentBaseStock + quantityToRestore
+            });
+          }
+        }
+        
+        // Update order state to clear deduction status
+        transaction.update(orderRef, {
+          stockDeducted: false,
+          auditError: auditWarning || null
+        });
+      });
+    } catch (error: any) {
+      console.error("Falha ao restaurar estoque:", error);
+      throw error;
+    }
+  };
+
   const updateStatus = async (orderId: string, newStatus: string) => {
     try {
+      if (newStatus === 'cancelled') {
+        await restoreStock(orderId);
+      }
       await updateDoc(doc(db, 'orders', orderId), { status: newStatus });
       toast.success('Status do pedido atualizado com sucesso');
       fetchOrders();
       // Keep selected order detail in sync if drawer is open
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev: any) => ({ ...prev, status: newStatus }));
+        setSelectedOrder((prev: any) => ({ 
+          ...prev, 
+          status: newStatus,
+          stockDeducted: newStatus === 'cancelled' ? false : prev.stockDeducted
+        }));
       }
-    } catch (error) {
-      toast.error('Erro ao atualizar status do pedido');
+    } catch (error: any) {
+      toast.error('Erro ao atualizar status: ' + (error?.message || 'Erro indeterminado'));
     }
   };
 
   const updatePaymentStatus = async (orderId: string, isPaid: boolean) => {
-    const payState = isPaid ? 'paid' : 'pending';
+    if (!isPaid) {
+      try {
+        await restoreStock(orderId);
+        await updateDoc(doc(db, 'orders', orderId), { 
+          paymentStatus: 'pending'
+        });
+        toast.success('Status do pagamento definido como Pendente e estoque devolvido!');
+        fetchOrders();
+        if (selectedOrder && selectedOrder.id === orderId) {
+          setSelectedOrder((prev: any) => ({ ...prev, paymentStatus: 'pending', stockDeducted: false }));
+        }
+      } catch (error: any) {
+        toast.error('Erro ao atualizar status do pagamento: ' + (error?.message || ''));
+      }
+      return;
+    }
+
     try {
-      await updateDoc(doc(db, 'orders', orderId), { paymentStatus: payState });
-      toast.success('Status do pagamento atualizado com sucesso');
+      await runTransaction(db, async (transaction) => {
+        const orderRef = doc(db, 'orders', orderId);
+        const orderSnap = await transaction.get(orderRef);
+        
+        if (!orderSnap.exists()) {
+          throw new Error('Pedido não encontrado no banco de dados.');
+        }
+        
+        const orderData = orderSnap.data();
+        
+        // Return early if stock is already deducted for this order
+        if (orderData.stockDeducted === true) {
+          transaction.update(orderRef, { paymentStatus: 'paid' });
+          return;
+        }
+        
+        const items = orderData.items || [];
+        for (const item of items) {
+          const productRef = doc(db, 'products', item.productId);
+          const productSnap = await transaction.get(productRef);
+          
+          if (!productSnap.exists()) {
+            throw new Error(`Produto Excluído: O produto "${item.name}" (ID: ${item.productId}) foi removido do catálogo de produtos!`);
+          }
+          
+          const productData = productSnap.data();
+          const quantityToDeduct = Number(item.quantity) || 1;
+          
+          // Check if this product has variation grades
+          if (productData.variations && productData.variations.length > 0) {
+            const size = item.attributes?.Tamanho || item.attributes?.['Tamanho'];
+            const color = item.attributes?.Cor || item.attributes?.['Cor'];
+            
+            const varIdx = productData.variations.findIndex(
+              (v: any) => v.size === size && v.color === color
+            );
+            
+            if (varIdx !== -1) {
+              const currentVarStock = Number(productData.variations[varIdx].stockQuantity) || 0;
+              if (currentVarStock < quantityToDeduct) {
+                throw new Error(`Estoque Insuficiente: A variação "${item.name}" (Cor: ${color || 'N/A'}, Tam: ${size || 'N/A'}) possui apenas ${currentVarStock} un., mas o pedido solicita ${quantityToDeduct}.`);
+              }
+              
+              // Deduct variation stock
+              productData.variations[varIdx].stockQuantity = currentVarStock - quantityToDeduct;
+              
+              // Recalculate main aggregate inventory quantity
+              const totalStock = productData.variations.reduce(
+                (sum: number, v: any) => sum + (Number(v.stockQuantity) || 0), 
+                0
+              );
+              
+              transaction.update(productRef, {
+                variations: productData.variations,
+                stockQuantity: totalStock
+              });
+            } else {
+              // Fallback to general stockQuantity of the parent product
+              const currentBaseStock = Number(productData.stockQuantity) || 0;
+              if (currentBaseStock < quantityToDeduct) {
+                throw new Error(`Estoque Insuficiente: O produto "${item.name}" possui apenas ${currentBaseStock} un., mas o pedido solicita ${quantityToDeduct}.`);
+              }
+              transaction.update(productRef, {
+                stockQuantity: currentBaseStock - quantityToDeduct
+              });
+            }
+          } else {
+            // Simple product without variations
+            const currentBaseStock = Number(productData.stockQuantity) || 0;
+            if (currentBaseStock < quantityToDeduct) {
+              throw new Error(`Estoque Insuficiente: O produto "${item.name}" possui apenas ${currentBaseStock} un., mas o pedido solicita ${quantityToDeduct}.`);
+            }
+            transaction.update(productRef, {
+              stockQuantity: currentBaseStock - quantityToDeduct
+            });
+          }
+        }
+        
+        // Successfully updated stocks! Mark payment status of the order as Paid and deduct state as True
+        transaction.update(orderRef, {
+          paymentStatus: 'paid',
+          stockDeducted: true,
+          auditError: null
+        });
+      });
+
+      toast.success('Baixa de estoque efetuada e pagamento registrado!');
       fetchOrders();
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev: any) => ({ ...prev, paymentStatus: payState }));
+        setSelectedOrder((prev: any) => ({ ...prev, paymentStatus: 'paid', stockDeducted: true, auditError: null }));
       }
-    } catch (error) {
-      toast.error('Erro ao registrar transação financeira');
+    } catch (error: any) {
+      console.error("Transação de pagamento falhou:", error);
+      const errorMsg = error?.message || 'Erro indeterminado ao processar transação de estoque';
+      
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          auditError: errorMsg
+        });
+      } catch (err) {
+        console.error("Erro ao registrar erro de auditoria na coleção orders:", err);
+      }
+      
+      toast.error(errorMsg, { duration: 6000 });
+      fetchOrders();
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev: any) => ({ ...prev, auditError: errorMsg }));
+      }
     }
   };
 
@@ -226,10 +429,19 @@ export default function AdminOrders() {
                           {order.paymentStatus !== 'paid' && (
                             <button 
                               onClick={() => updatePaymentStatus(order.id, true)} 
-                              className="text-[9px] text-blue-600 font-extrabold hover:underline w-fit text-left hover:text-blue-700"
+                              className="text-[9px] text-blue-600 font-extrabold hover:underline w-fit text-left hover:text-blue-700 cursor-pointer"
                             >
                               Marcar Pago
                             </button>
+                          )}
+
+                          {order.auditError && (
+                            <span 
+                              className="text-[9px] text-rose-600 font-bold bg-rose-50 border border-rose-250 rounded px-1.5 py-0.5 mt-1 block max-w-[130px] truncate" 
+                              title={order.auditError}
+                            >
+                              ⚠️ Falha Realizada
+                            </span>
                           )}
                         </div>
                       </TableCell>
@@ -339,6 +551,16 @@ export default function AdminOrders() {
 
           {/* Modal Multi-Sections Grid */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {selectedOrder?.auditError && (
+              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl flex items-start gap-3">
+                <span className="text-lg mt-0.5 shrink-0">⚠️</span>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-900">Erro de Auditoria / Estoque Insuficiente</h4>
+                  <p className="text-xs font-semibold mt-1 leading-relaxed text-rose-700">{selectedOrder.auditError}</p>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Customer and address card */}
               <Card className="rounded-2xl border border-slate-200 shadow-none bg-slate-50/40 p-4">

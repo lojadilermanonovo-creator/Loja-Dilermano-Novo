@@ -10,7 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 
-const AVAILABLE_SIZES = ['PP', 'P', 'M', 'G', 'GG', 'XGG'];
+const AVAILABLE_SIZES = [
+  'PP', 'P', 'M', 'G', 'GG', 'XGG',
+  '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44'
+];
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState<any[]>([]);

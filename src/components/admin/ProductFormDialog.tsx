@@ -183,6 +183,12 @@ export default function ProductFormDialog({ open, onOpenChange, product, onSucce
     }
   }, [variations, form]);
 
+  const selectedCategoryId = form.watch('categoryId');
+  const activeCategory = categories.find(c => c.id === selectedCategoryId);
+  const currentAvailableSizes = (activeCategory?.allowedSizes && activeCategory.allowedSizes.length > 0)
+    ? activeCategory.allowedSizes
+    : AVAILABLE_SIZES;
+
   const handleVariationFieldChange = (index: number, field: string, val: any) => {
     setVariations(prev => {
       const next = [...prev];
@@ -295,21 +301,25 @@ export default function ProductFormDialog({ open, onOpenChange, product, onSucce
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 align-top">
                   <Label htmlFor="categoryId" className="text-xs font-semibold text-slate-700">Categoria do Produto</Label>
-                  <Select 
-                    value={form.watch('categoryId')} 
-                    onValueChange={(val) => form.setValue('categoryId', val)}
-                  >
-                    <SelectTrigger id="categoryId" className="bg-white rounded-xl border-slate-200 h-10">
-                      <SelectValue placeholder="Selecione uma categoria ativa" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white">
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id} className="cursor-pointer">{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div key={`${categories.length}-${form.watch('categoryId')}`}>
+                    <Select 
+                      value={form.watch('categoryId')} 
+                      onValueChange={(val) => form.setValue('categoryId', val)}
+                    >
+                      <SelectTrigger id="categoryId" className="bg-white rounded-xl border-slate-200 h-10 w-full">
+                        <SelectValue placeholder="Selecione uma categoria ativa">
+                          {categories.find(c => c.id === form.watch('categoryId'))?.name || ""}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-white">
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id} className="cursor-pointer">{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   {form.formState.errors.categoryId && <p className="text-xs text-rose-500 font-medium">{form.formState.errors.categoryId.message as string}</p>}
                 </div>
 
@@ -325,9 +335,14 @@ export default function ProductFormDialog({ open, onOpenChange, product, onSucce
               
               {/* Tamanhos Box */}
               <div className="p-5 rounded-2xl border border-slate-200 bg-white">
-                <Label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-3">Tamanhos Disponíveis</Label>
+                <div className="flex justify-between items-center mb-3">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Tamanhos Disponíveis</Label>
+                  {activeCategory?.allowedSizes && activeCategory.allowedSizes.length > 0 && (
+                    <span className="text-[9px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-bold">Grade Customizada</span>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  {AVAILABLE_SIZES.map((sz) => {
+                  {currentAvailableSizes.map((sz) => {
                     const isSelected = selectedSizes.includes(sz);
                     return (
                       <button

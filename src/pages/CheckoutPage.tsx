@@ -43,7 +43,10 @@ export default function CheckoutPage() {
         items,
         subtotal,
         total: subtotal,
-        shippingAddress: address,
+        shippingAddress: {
+          ...address,
+          email: user.email || '',
+        },
         status: 'pending',
         paymentStatus: 'pending',
         createdAt: serverTimestamp(),
@@ -52,25 +55,10 @@ export default function CheckoutPage() {
 
       const docRef = await addDoc(collection(db, 'orders'), orderData);
       
-      // Call the Callable Cloud Function for Stripe Checkout
-      const createCheckout = httpsCallable(functions, 'createCheckout');
-      const { data }: any = await createCheckout({
-        items: items.map(item => ({
-          id: item.productId,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity
-        })),
-        successUrl: `${window.location.origin}/checkout/success?orderId=${docRef.id}`,
-        cancelUrl: `${window.location.origin}/checkout`
-      });
-
-      toast.success('Pedido criado! Redirecionando para o pagamento...');
+      toast.success('Pedido criado com sucesso! Siga as instruções de pagamento.');
       
-      setTimeout(() => {
-        clearCart();
-        window.location.href = data.url;
-      }, 1500);
+      clearCart();
+      navigate(`/checkout/success?orderId=${docRef.id}`);
 
     } catch (error) {
       toast.error('Erro ao processar checkout');
@@ -142,11 +130,11 @@ export default function CheckoutPage() {
             </div>
 
             <Button type="submit" disabled={loading} className="w-full h-14 bg-ocean rounded-2xl font-bold text-lg">
-              {loading ? 'Processando...' : 'Finalizar e Pagar'}
+              {loading ? 'Processando...' : 'Finalizar Pedido'}
             </Button>
             
             <p className="text-xs text-center text-muted-foreground">
-              Ao clicar em pagar, você será redirecionado para a plataforma de pagamento segura da Stripe.
+              Ao clicar em finalizar, você verá a chave PIX e as instruções para conclusão do seu pagamento.
             </p>
           </section>
         </div>
