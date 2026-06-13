@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 
+const AVAILABLE_SIZES = ['PP', 'P', 'M', 'G', 'GG', 'XGG'];
+
 export default function AdminCategories() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,8 @@ export default function AdminCategories() {
   const [name, setName] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [isActive, setIsActive] = useState(true);
+
+  const [allowedSizes, setAllowedSizes] = useState<string[]>([]);
 
   // Stats
   const [activeCount, setActiveCount] = useState(0);
@@ -50,11 +54,13 @@ export default function AdminCategories() {
       setName(category.name || '');
       setImageUrl(category.imageUrl || '');
       setIsActive(category.isActive ?? true);
+      setAllowedSizes(category.allowedSizes || []);
     } else {
       setSelectedCategory(null);
       setName('');
       setImageUrl('');
       setIsActive(true);
+      setAllowedSizes([]);
     }
     setIsDialogOpen(true);
   };
@@ -69,6 +75,7 @@ export default function AdminCategories() {
         name,
         imageUrl,
         isActive,
+        allowedSizes,
         updatedAt: serverTimestamp(),
       };
 
@@ -205,7 +212,18 @@ export default function AdminCategories() {
                   </TableCell>
 
                   <TableCell className="py-4 font-bold text-slate-900 text-sm">
-                    {cat.name}
+                    <div>{cat.name}</div>
+                    {cat.allowedSizes && cat.allowedSizes.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mt-1 font-normal">
+                        {cat.allowedSizes.map((s: string) => (
+                          <span key={s} className="text-[9px] bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded-md font-semibold">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[9px] text-slate-400 font-normal block mt-1">Grade Geral (Padrão)</span>
+                    )}
                   </TableCell>
 
                   <TableCell className="py-4 text-xs font-mono text-slate-400">
@@ -285,6 +303,38 @@ export default function AdminCategories() {
                 placeholder="https://images.unsplash.com/photo-..." 
                 className="rounded-xl border-slate-200 text-sm"
               />
+            </div>
+
+            <div className="space-y-2 pt-1 pb-1">
+              <Label className="text-slate-700 font-semibold text-xs">Grade de Tamanhos Permitida (allowedSizes)</Label>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {AVAILABLE_SIZES.map((sz) => {
+                  const isSelected = allowedSizes.includes(sz);
+                  return (
+                    <button
+                      key={sz}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          setAllowedSizes(allowedSizes.filter(s => s !== sz));
+                        } else {
+                          setAllowedSizes([...allowedSizes, sz]);
+                        }
+                      }}
+                      className={`px-3.5 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/15' 
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {sz}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                Selecione os tamanhos dessa categoria para a vitrine. Se vazio, o catálogo usará a grade completa como fallback.
+              </p>
             </div>
 
             <div className="flex items-center space-x-3 pt-1">

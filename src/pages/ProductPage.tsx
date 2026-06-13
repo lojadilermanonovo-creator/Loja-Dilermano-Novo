@@ -11,6 +11,19 @@ import { Badge } from '@/components/ui/badge';
 import ProductCard from '@/src/components/ProductCard';
 import { Separator } from '@/components/ui/separator';
 
+const COLOR_MAP: Record<string, string> = {
+  'Preto': '#000000',
+  'Branco': '#ffffff',
+  'Azul': '#3b82f6',
+  'Vermelho': '#ef4444',
+  'Verde': '#10b981',
+  'Amarelo': '#eab308',
+  'Rosa': '#ec4899',
+  'Cinza': '#6b7280',
+  'Marrom': '#78350f',
+  'Bege': '#f5f5dc'
+};
+
 export default function ProductPage() {
   const { id } = useParams();
   const [product, setProduct] = useState<any>(null);
@@ -18,6 +31,7 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedSize, setSelectedSize] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
   const { addItem } = useCart();
   const navigate = useNavigate();
@@ -30,6 +44,18 @@ export default function ProductPage() {
         const productDoc = await getDoc(doc(db, 'products', id));
         if (productDoc.exists()) {
           const productData: any = { id: productDoc.id, ...(productDoc.data() as any) };
+
+          if (productData.categoryId) {
+            try {
+              const categoryDoc = await getDoc(doc(db, 'categories', productData.categoryId));
+              if (categoryDoc.exists()) {
+                productData.category = { id: categoryDoc.id, ...(categoryDoc.data() as any) };
+              }
+            } catch (catErr) {
+              console.error("ProductPage: Error loading category", catErr);
+            }
+          }
+
           setProduct(productData);
 
           // Fetch related products from same category
@@ -62,18 +88,41 @@ export default function ProductPage() {
   }, [id]);
 
   const handleAddToCart = () => {
-    if (product.variants?.length > 0 && !selectedSize) {
+    const categorySizes = product?.category?.allowedSizes;
+    const productSizes = product?.selectedSizes;
+    const sizesToDisplay = (categorySizes && categorySizes.length > 0)
+      ? categorySizes
+      : (productSizes && productSizes.length > 0)
+        ? productSizes
+        : ['P', 'M', 'G', 'GG'];
+
+    if (sizesToDisplay.length > 0 && !selectedSize) {
       toast.error('Por favor, selecione um tamanho');
       return;
     }
 
+    if (product.selectedColors?.length > 0 && !selectedColor) {
+      toast.error('Por favor, selecione uma cor');
+      return;
+    }
+
+    const attributes: Record<string, string> = {};
+    if (selectedSize) attributes['Tamanho'] = selectedSize;
+    if (selectedColor) attributes['Cor'] = selectedColor;
+
+    // Generate accurate variant identifier for cart unique matching group
+    const variantId = (selectedSize || selectedColor) 
+      ? `${selectedSize || ''}-${selectedColor || ''}`.trim()
+      : undefined;
+
     addItem({
       productId: product.id,
+      variantId,
       name: product.name,
       price: product.price,
       quantity: quantity,
       imageUrl: product.images?.[0]?.url,
-      attributes: selectedSize ? { Tamanho: selectedSize } : undefined
+      attributes: Object.keys(attributes).length > 0 ? attributes : undefined
     });
     toast.success(`${product.name} adicionado ao carrinho!`);
   };
@@ -157,22 +206,79 @@ export default function ProductPage() {
             {product.description || product.shortDescription || "Este item combina elegância e conforto, perfeito para qualquer ocasião."}
           </p>
 
-          {/* Dummy Sizes for Demo - In real app fetch from product.variants */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold uppercase tracking-wider">Tamanho</h3>
-            <div className="flex flex-wrap gap-2">
-              {['P', 'M', 'G', 'GG'].map((size) => (
-                <Button
-                  key={size}
-                  variant={selectedSize === size ? 'default' : 'outline'}
-                  className={`h-12 w-12 p-0 font-bold rounded-xl ${selectedSize === size ? 'bg-ocean' : ''}`}
-                  onClick={() => setSelectedSize(size)}
-                >
-                  {size}
-                </Button>
-              ))}
+          {/* Dynamic Colors Selection Section */}
+          {product.selectedColors && product.selectedColors.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">Selecione a Cor</h3>
+              <div className="flex flex-wrap gap-3">
+                {product.selectedColors.map((colorName: string) => {
+                  const hex = COLOR_MAP[colorName] || '#cccccc';
+                  const isSelected = selectedColor === colorName;
+                  return (
+                    <button
+                      key={colorName}
+                      type="button"
+                      onClick={() => setSelectedColor(colorName)}
+                      className={`h-10 items-center flex gap-2 pl-2.5 pr-4 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'border-ocean bg-ocean/5 text-ocean ring-2 ring-ocean/10 shadow-sm' 
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
+                      title={colorName}
+                    >
+                      <span 
+                        className="w-4.5 h-4.5 rounded-md border border-slate-300 flex-shrink-0" 
+                        style={{ backgroundColor: hex }} 
+                      />
+                      <span>{colorName}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Dynamic Sizes Selection Section */}
+          {(() => {
+            const categorySizes = product?.category?.allowedSizes;
+            const productSizes = product?.selectedSizes;
+            const sizesToDisplay = (categorySizes && categorySizes.length > 0)
+              ? categorySizes
+              : (productSizes && productSizes.length > 0)
+                ? productSizes
+                : ['P', 'M', 'G', 'GG'];
+
+            if (sizesToDisplay.length === 0) return null;
+
+            return (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">Selecione o Tamanho</h3>
+                  {product?.category?.allowedSizes && product.category.allowedSizes.length > 0 && (
+                    <span className="text-[10px] text-ocean font-bold bg-ocean/5 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Grade da Categoria
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sizesToDisplay.map((size: string) => (
+                    <Button
+                      key={size}
+                      variant={selectedSize === size ? 'default' : 'outline'}
+                      className={`h-12 w-12 p-0 font-bold rounded-xl transition-all ${
+                        selectedSize === size 
+                          ? 'bg-ocean hover:bg-ocean/90 text-white border-ocean shadow-md shadow-ocean/15' 
+                          : 'hover:bg-slate-50'
+                      }`}
+                      onClick={() => setSelectedSize(size)}
+                    >
+                      {size}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="flex flex-col gap-4 pt-4">
             <div className="flex items-center gap-4">
