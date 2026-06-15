@@ -11,10 +11,8 @@ import {
   Settings, Save, Phone, QrCode, MapPin, Store, 
   Globe, Key, RefreshCw, AlertCircle, CheckCircle2, Truck 
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
 
 export default function AdminSettings() {
-  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -89,45 +87,8 @@ export default function AdminSettings() {
   };
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      const code = searchParams.get('code');
-      if (code) {
-        setConnecting(true);
-        setActiveTab('melhorenvio');
-        try {
-          toast.loading('Iniciando conexão com o Melhor Envio...', { id: 'melhor-envio-connection' });
-          
-          const exchangeFn = httpsCallable(functions, 'exchangeMelhorEnvioCode');
-          const redirectUri = window.location.origin + '/admin/settings';
-          
-          const result: any = await exchangeFn({ 
-            code, 
-            redirectUri 
-          });
-
-          if (result.data && result.data.success) {
-            toast.success('Melhor Envio conectado com sucesso!', { id: 'melhor-envio-connection' });
-            setMeConnected(true);
-            setMeExpiresAt(result.data.expiresAt);
-          } else {
-            toast.error('Falha ao concluir autenticação', { id: 'melhor-envio-connection' });
-          }
-        } catch (err: any) {
-          console.error("Erro no callback do Melhor Envio:", err);
-          toast.error(`Falha ao conectar com Melhor Envio: ${err.message || err}`, { id: 'melhor-envio-connection' });
-        } finally {
-          setConnecting(false);
-          // Clean the code parameter from the URL bar without reloading
-          setSearchParams({}, { replace: true });
-          loadSettings();
-        }
-      } else {
-        loadSettings();
-      }
-    };
-
-    handleAuthCallback();
-  }, [searchParams]);
+    loadSettings();
+  }, []);
 
   const handleSaveGeneral = async () => {
     setSaving(true);
@@ -193,11 +154,16 @@ export default function AdminSettings() {
         ? 'https://sandbox.melhorenvio.com.br/oauth/authorize' 
         : 'https://melhorenvio.com.br/oauth/authorize';
       
-      const redirectUri = window.location.origin + '/admin/settings';
+      const redirectUri = window.location.origin.includes('localhost') || window.location.origin.includes('run.app')
+        ? window.location.origin + '/'
+        : 'https://dilermanoimport.netlify.app/';
       const scope = 'shipping-calculate';
 
       const authUrl = `${baseUrl}?client_id=${meClientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
       
+      const oauthUrl = authUrl;
+      console.log("[MELHOR_ENVIO] OAuth URL:", oauthUrl);
+
       toast.loading('Redirecionando para o Melhor Envio...');
       window.location.href = authUrl;
     } catch (e) {

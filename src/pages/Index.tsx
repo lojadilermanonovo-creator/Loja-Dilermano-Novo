@@ -2,16 +2,22 @@ import React, { useEffect, useState } from 'react';
 import HeroCarousel from '@/src/components/HeroCarousel';
 import CategoryCard from '@/src/components/CategoryCard';
 import ProductCard from '@/src/components/ProductCard';
-import { db } from '@/src/integrations/firebase/client';
+import { db, functions } from '@/src/integrations/firebase/client';
 import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { toast } from 'sonner';
 
 export default function Index() {
   const [categories, setCategories] = useState<any[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
   const [newProducts, setNewProducts] = useState<any[]>([]);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { loading: authLoading } = useAuth();
+  const [exchangeStarted, setExchangeStarted] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,6 +63,47 @@ export default function Index() {
 
     fetchData();
   }, []);
+
+  const code = searchParams.get('code');
+
+  useEffect(() => {
+    if (!code || authLoading || exchangeStarted) return;
+
+    const handleCallback = async () => {
+      setExchangeStarted(true);
+      console.log("[MELHOR_ENVIO] Authorization Code:", code);
+      
+      try {
+        toast.loading('Iniciando conexão integrada com o Melhor Envio...', { id: 'melhor-envio-connection' });
+        
+        const redirectUri = window.location.origin.includes('localhost') || window.location.origin.includes('run.app')
+          ? window.location.origin + '/'
+          : 'https://dilermanoimport.netlify.app/';
+        
+        const exchangeFn = httpsCallable(functions, 'exchangeMelhorEnvioCode');
+        const result: any = await exchangeFn({ 
+          code, 
+          redirectUri 
+        });
+
+        if (result.data && result.data.success) {
+          console.log("[MELHOR_ENVIO] Token exchange success");
+          toast.success('Melhor Envio conectado com sucesso!', { id: 'melhor-envio-connection' });
+        } else {
+          toast.error('Falha ao concluir autenticação com Melhor Envio', { id: 'melhor-envio-connection' });
+        }
+      } catch (err: any) {
+        console.error("Erro no callback do Melhor Envio:", err);
+        toast.error(`Falha ao conectar com o Melhor Envio: ${err.message || err}`, { id: 'melhor-envio-connection' });
+      } finally {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        console.log("[MELHOR_ENVIO] Redirecting to admin");
+        navigate('/admin/configuracoes');
+      }
+    };
+
+    handleCallback();
+  }, [code, authLoading, exchangeStarted, navigate]);
 
   return (
     <div className="space-y-12 pb-20">
