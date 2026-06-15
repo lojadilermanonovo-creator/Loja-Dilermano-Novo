@@ -1,4 +1,5 @@
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
+import * as admin from "firebase-admin";
 
 export const calculateShipping = onCall({ 
   region: "us-east1",
@@ -7,16 +8,148 @@ export const calculateShipping = onCall({
   const { zipCode } = request.data;
   
   if (!zipCode) {
-    throw new HttpsError("invalid-argument", "Zip code is required.");
+    throw new HttpsError("invalid-argument", "CEP do destinatário é obrigatório.");
   }
 
-  console.log("Calculating shipping for", zipCode);
+  const cleanDestZip = zipCode.replace(/\D/g, "");
+  if (cleanDestZip.length !== 8) {
+    throw new HttpsError("invalid-argument", "Formato de CEP inválido. O CEP deve conter 8 dígitos.");
+  }
+
+  const db = admin.firestore();
   
-  // Real logic with Correios API would go here
-  return {
-    options: [
-      { name: "PAC", price: 25.50, days: 8 },
-      { name: "SEDEX", price: 42.90, days: 3 }
-    ]
-  };
+  // 1. Load config
+  const configSnap = await db.collection("settings").doc("melhorenvio").get();
+  if (!configSnap.exists) {
+    throw new HttpsError("failed-precondition", "Melhor Envio não está configurado. Cadastre as chaves no painel do administrador.");
+  }
+  
+  const config = configSnap.data();
+  if (!config || !config.clientId || !config.clientSecret || !config.originZip) {
+    throw new HttpsError("failed-precondition", "Melhor Envio Client ID, Client Secret e CEP de origem são obrigatórios.");
+  }
+
+  const cleanOriginZip = config.originZip.replace(/\D/g, "");
+  if (cleanOriginZip.length !== 8) {
+    throw new HttpsError("failed-precondition", "CEP de origem inválido nas configurações do Melhor Envio.");
+  }
+
+  const isSandbox = config.mode === "sandbox";
+  const baseUrl = isSandbox ? "https://sandbox.melhorenvio.com.br" : "https://melhorenvio.com.br";
+
+  // 2. Load and refresh tokens if necessary
+  const tokensSnap = await db.collection("settings").doc("melhorenvio_tokens").get();
+  if (!tokensSnap.exists) {
+    throw new HttpsError("failed-precondition", "Conexão com o Melhor Envio não autorizada. Conecte pelo painel do administrador.");
+  }
+
+  const tokens = tokensSnap.data();
+  if (!tokens || !tokens.accessToken || !tokens.refreshToken) {
+    throw new HttpsError("failed-precondition", "Token do Melhor Envio ausente ou inválido. Refaça a autenticação.");
+  }
+
+  let currentAccessToken = tokens.accessToken;
+
+  // Check if token is expired or expires in the next 2 minutes
+  if (Date.now() > (tokens.expiresAt - 120000)) {
+    console.log("Melhor Envio Access Token expired or near expiration. Refreshing...");
+    try {
+      const refreshResponse = await fetch(`${baseUrl}/oauth/token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "User-Agent": "DilermandoStore/1.0"
+        },
+        body: JSON.stringify({
+          grant_type: "refresh_token",
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          refresh_token: tokens.refreshToken
+        })
+      });
+
+      if (!refreshResponse.ok) {
+        const errorText = await refreshResponse.text();
+        throw new Error(`Token refresh failed with status ${refreshResponse.status}: ${errorText}`);
+      }
+
+      const newTokens = await refreshResponse.json();
+      currentAccessToken = newTokens.access_token;
+
+      // Update stored tokens
+      await db.collection("settings").doc("melhorenvio_tokens").set({
+        accessToken: newTokens.access_token,
+        refreshToken: newTokens.refresh_token,
+        expiresAt: Date.now() + (newTokens.expires_in * 1000),
+        connectedAt: tokens.connectedAt || Date.now(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      console.log("Melhor Envio Access Token successfully refreshed!");
+    } catch (refreshErr: any) {
+      console.error("Error refreshing Melhor Envio token:", refreshErr);
+      throw new HttpsError("internal", `Não foi possível renovar o token do Melhor Envio: ${refreshErr.message}`);
+    }
+  }
+
+  // 3. Make real shipment calculate call to Melhor Envio
+  try {
+    const calculateUrl = `${baseUrl}/api/v2/me/shipment/calculate`;
+    console.log(`Calling Melhor Envio calculate API at: ${calculateUrl} from ${cleanOriginZip} to ${cleanDestZip}`);
+    
+    const response = await fetch(calculateUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${currentAccessToken}`,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "DilermandoStore/1.0"
+      },
+      body: JSON.stringify({
+        from: {
+          postal_code: cleanOriginZip
+        },
+        to: {
+          postal_code: cleanDestZip
+        },
+        package: {
+          width: 15,
+          height: 15,
+          length: 15,
+          weight: 0.5
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Melhor Envio API calculation error:", errorText);
+      throw new Error(`Error responding from Melhor Envio. Code ${response.status}: ${errorText}`);
+    }
+
+    const shippingOptions = await response.json();
+
+    if (!Array.isArray(shippingOptions)) {
+      console.warn("Melhor Envio response of calculation was not an array:", shippingOptions);
+      return { options: [] };
+    }
+
+    // Filter valid services and format for frontend
+    const options = shippingOptions
+      .filter((opt: any) => opt && !opt.error && opt.price)
+      .map((opt: any) => ({
+        id: opt.id,
+        name: `${opt.company.name} ${opt.name}`,
+        price: parseFloat(opt.custom_price || opt.price),
+        days: opt.delivery_time,
+        companyName: opt.company.name,
+        serviceName: opt.name,
+        picture: opt.company.picture || ""
+      }));
+
+    return { options };
+  } catch (calcErr: any) {
+    console.error("Shipping calculation failure:", calcErr);
+    throw new HttpsError("internal", calcErr.message || "Falha externa de cálculo de frete com Melhor Envio.");
+  }
 });

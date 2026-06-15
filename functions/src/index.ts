@@ -4,6 +4,7 @@ admin.initializeApp();
 
 // Export functions from separate files
 export { calculateShipping } from "./calculateShipping";
+export { exchangeMelhorEnvioCode } from "./exchangeMelhorEnvioCode";
 export { setAdminClaim } from "./setAdminClaim";
 
 // Database Triggers

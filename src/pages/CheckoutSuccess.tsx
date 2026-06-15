@@ -24,26 +24,41 @@ export default function CheckoutSuccess() {
         return;
       }
       try {
+        console.log("[F12 DEBUG] Iniciando leitura do pedido ID:", orderId);
         const orderSnap = await getDoc(doc(db, 'orders', orderId));
         if (orderSnap.exists()) {
+          console.log("[F12 DEBUG] Dados do pedido carregados com sucesso:", orderSnap.data());
           setOrder(orderSnap.data());
+        } else {
+          console.warn("[F12 DEBUG] Documento do pedido não foi localizado no Firestore para ID:", orderId);
         }
 
+        console.log("[F12 DEBUG] Buscando configurações gerais em 'settings/general'...");
         const settingsSnap = await getDoc(doc(db, 'settings', 'general'));
+        console.log("[F12 DEBUG] Resposta recebida para 'settings/general'. Existe?", settingsSnap.exists());
+        
         if (settingsSnap.exists()) {
-          const key = settingsSnap.data().pixKey || '';
+          const data = settingsSnap.data();
+          console.log("[F12 DEBUG] Conteúdo completo de 'settings/general':", JSON.stringify(data, null, 2));
+          const key = data.pixKey || '';
+          console.log("[F12 DEBUG] Chave PIX identificada no documento:", key);
           setPixKey(key);
           if (key) {
             try {
               const url = await QRCode.toDataURL(key, { margin: 1, width: 256 });
               setQrDataUrl(url);
+              console.log("[F12 DEBUG] QR Code gerado locally com sucesso.");
             } catch (qrErr) {
-              console.error("Erro ao gerar QR Code local:", qrErr);
+              console.error("[F12 DEBUG] Erro ao gerar QR Code local a partir da chave PIX:", qrErr);
             }
+          } else {
+            console.warn("[F12 DEBUG] A chave PIX 'pixKey' está vazia ou ausente no documento.");
           }
+        } else {
+          console.warn("[F12 DEBUG] O documento 'settings/general' não existe no banco de dados.");
         }
       } catch (err) {
-        console.error("Erro ao carregar dados do pedido:", err);
+        console.error("[F12 DEBUG] Falha ao carregar dados do pedido ou configurações:", err);
       } finally {
         setLoading(false);
       }

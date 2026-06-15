@@ -73,5 +73,10 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
     }
+
+    match /settings/{id} {
+      allow read: if id == 'general' || isAdmin();
+      allow write: if isAdmin();
+    }
   }
 }

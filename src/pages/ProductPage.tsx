@@ -33,6 +33,8 @@ export default function ProductPage() {
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [calculatingShipping, setCalculatingShipping] = useState(false);
   const { addItem } = useCart();
   const navigate = useNavigate();
 
@@ -308,8 +310,29 @@ export default function ProductPage() {
               >
                 <ShoppingCart className="h-5 w-5" /> Adicionar ao Carrinho
               </Button>
-            </div>
-          </div>
+                 </div>
+                 {shippingOptions.length > 0 && (
+                   <div className="space-y-2 pt-2 border-t text-left">
+                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Opções reais Melhor Envio:</p>
+                     <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                       {shippingOptions.map((opt: any) => (
+                         <div key={opt.id} className="flex justify-between items-center text-xs p-2 bg-slate-50 border rounded-xl">
+                           <div className="flex items-center gap-2">
+                             {opt.picture && <img src={opt.picture} className="h-4 w-6 object-contain" alt="" referrerPolicy="no-referrer" />}
+                             <span className="font-semibold">{opt.name}</span>
+                           </div>
+                           <div className="text-right">
+                             <span className="font-bold text-blue-600 block">
+                               {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(opt.price)}
+                             </span>
+                             <span className="text-[10px] text-slate-400">{opt.days} dias úteis</span>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+              </div>
 
           <div className="grid grid-cols-1 gap-4 pt-4">
              <div className="flex items-center gap-3 p-4 rounded-2xl bg-surface-elevated/50">
@@ -340,22 +363,38 @@ export default function ProductPage() {
                      id="zip-input"
                    />
                    <Button 
-                     size="sm" 
-                     className="rounded-lg h-10 px-4 font-bold"
-                     onClick={async () => {
-                       const zip = (document.getElementById('zip-input') as HTMLInputElement).value;
-                       if (!zip) return;
-                       try {
-                         const calculateShipping = httpsCallable(functions, 'calculateShipping');
-                         const { data }: any = await calculateShipping({ zipCode: zip });
-                         toast.success(`Cálculo realizado: ${data.options[0].name} - R$ ${data.options[0].price}`);
-                       } catch (e) {
-                         toast.error('Erro ao calcular frete');
-                       }
-                     }}
-                   >
-                     OK
-                   </Button>
+                      size="sm" 
+                      className="rounded-lg h-10 px-4 font-bold"
+                      disabled={calculatingShipping}
+                      onClick={async () => {
+                        const zip = (document.getElementById('zip-input') as HTMLInputElement).value;
+                        const cleanZip = zip.replace(/\D/g, '');
+                        if (cleanZip.length !== 8) {
+                          toast.error('CEP inválido! Digite um CEP com 8 dígitos.');
+                          return;
+                        }
+                        
+                        setCalculatingShipping(true);
+                        setShippingOptions([]);
+                        try {
+                          const calculateShipping = httpsCallable(functions, 'calculateShipping');
+                          const result: any = await calculateShipping({ zipCode: cleanZip });
+                          if (result.data && result.data.options && result.data.options.length > 0) {
+                            setShippingOptions(result.data.options);
+                            toast.success('Opções de frete carregadas!');
+                          } else {
+                            toast.warning('Melhor Envio não retornou opções de frete para este CEP.');
+                          }
+                        } catch (e: any) {
+                          console.error("[F12 DEBUG] Falha ao chamar a Cloud Function 'calculateShipping':", e);
+                          toast.error(e.message || 'Erro ao calcular frete com Melhor Envio');
+                        } finally {
+                          setCalculatingShipping(false);
+                        }
+                      }}
+                    >
+                      {calculatingShipping ? '...' : 'OK'}
+                    </Button>
                 </div>
              </div>
           </div>

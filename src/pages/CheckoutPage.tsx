@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCart } from '@/src/contexts/CartContext';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { db, functions } from '@/src/integrations/firebase/client';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
+import { RefreshCw, MapPin, Truck, AlertCircle } from 'lucide-react';
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart();
@@ -28,6 +29,42 @@ export default function CheckoutPage() {
     state: ''
   });
 
+  // Shipping dynamic states
+  const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+  const [selectedShippingOption, setSelectedShippingOption] = useState<any | null>(null);
+  const [calculatingShipping, setCalculatingShipping] = useState(false);
+
+  // Monitor Zip Code pattern (8 digits) to calculate shipping
+  useEffect(() => {
+    const cleanZip = address.zipCode.replace(/\D/g, '');
+    if (cleanZip.length === 8) {
+      calculateShippingOptions(cleanZip);
+    } else {
+      setShippingOptions([]);
+      setSelectedShippingOption(null);
+    }
+  }, [address.zipCode]);
+
+  const calculateShippingOptions = async (zip: string) => {
+    setCalculatingShipping(true);
+    setSelectedShippingOption(null);
+    setShippingOptions([]);
+    try {
+      const calculateShipping = httpsCallable(functions, 'calculateShipping');
+      const result: any = await calculateShipping({ zipCode: zip });
+      if (result.data && result.data.options && result.data.options.length > 0) {
+        setShippingOptions(result.data.options);
+      } else {
+        toast.warning('Nenhuma opção de frete disponível para este CEP.');
+      }
+    } catch (err: any) {
+      console.error("[Checkout] Erro ao calcular frete real:", err);
+      toast.error(err.message || 'Erro ao cotar frete real com Melhor Envio');
+    } finally {
+      setCalculatingShipping(false);
+    }
+  };
+
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -36,13 +73,28 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (!selectedShippingOption) {
+      toast.error('Selecione uma opção de frete real do Melhor Envio para prosseguir.');
+      return;
+    }
+
     setLoading(true);
     try {
+      const shippingCost = selectedShippingOption ? selectedShippingOption.price : 0;
+      const totalAmount = subtotal + shippingCost;
+
       const orderData = {
         userId: user.uid,
         items,
         subtotal,
-        total: subtotal,
+        shippingCost,
+        shippingOption: selectedShippingOption ? {
+          id: selectedShippingOption.id,
+          name: selectedShippingOption.name,
+          days: selectedShippingOption.days,
+          company: selectedShippingOption.company || selectedShippingOption.name
+        } : null,
+        total: totalAmount,
         shippingAddress: {
           ...address,
           email: user.email || '',
@@ -67,73 +119,154 @@ export default function CheckoutPage() {
     }
   };
 
+  const selectedShippingPrice = selectedShippingOption ? selectedShippingOption.price : 0;
+  const finalTotalAmount = subtotal + selectedShippingPrice;
+
   return (
-    <div className="container mx-auto px-4 py-12">
-      <h1 className="text-4xl font-black tracking-tighter uppercase mb-12">Checkout</h1>
+    <div className="container mx-auto px-4 py-12 max-w-6xl">
+      <h1 className="text-4xl font-black tracking-tighter uppercase mb-12 flex items-center gap-2">
+        <Truck className="h-9 w-9 text-blue-600" />
+        Checkout do Pedido
+      </h1>
 
       <form onSubmit={handleCheckout} className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         <div className="space-y-8">
-          <section className="space-y-6">
-            <h2 className="text-xl font-bold">Endereço de Entrega</h2>
+          <section className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-blue-500" /> Endereço de Entrega
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="fullName">Nome Completo</Label>
-                <Input id="fullName" required value={address.fullName} onChange={e => setAddress({...address, fullName: e.target.value})} />
+                <Label htmlFor="fullName" className="text-xs font-bold text-slate-600">Nome Completo</Label>
+                <Input id="fullName" required value={address.fullName} onChange={e => setAddress({...address, fullName: e.target.value})} className="rounded-xl border-slate-200 h-10" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="zipCode">CEP</Label>
-                <Input id="zipCode" required value={address.zipCode} onChange={e => setAddress({...address, zipCode: e.target.value})} />
+                <Label htmlFor="zipCode" className="text-xs font-bold text-slate-600">CEP</Label>
+                <Input id="zipCode" placeholder="Ex: 00000-000" required value={address.zipCode} onChange={e => setAddress({...address, zipCode: e.target.value})} className="rounded-xl border-slate-200 h-10 font-mono" />
               </div>
               <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="street">Rua</Label>
-                <Input id="street" required value={address.street} onChange={e => setAddress({...address, street: e.target.value})} />
+                <Label htmlFor="street" className="text-xs font-bold text-slate-600">Rua</Label>
+                <Input id="street" required value={address.street} onChange={e => setAddress({...address, street: e.target.value})} className="rounded-xl border-slate-200 h-10" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="number">Número</Label>
-                <Input id="number" required value={address.number} onChange={e => setAddress({...address, number: e.target.value})} />
+                <Label htmlFor="number" className="text-xs font-bold text-slate-600">Número</Label>
+                <Input id="number" required value={address.number} onChange={e => setAddress({...address, number: e.target.value})} className="rounded-xl border-slate-200 h-10" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="complement">Complemento</Label>
-                <Input id="complement" value={address.complement} onChange={e => setAddress({...address, complement: e.target.value})} />
+                <Label htmlFor="complement" className="text-xs font-bold text-slate-600">Complemento</Label>
+                <Input id="complement" value={address.complement} onChange={e => setAddress({...address, complement: e.target.value})} className="rounded-xl border-slate-200 h-10" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="neighborhood">Bairro</Label>
-                <Input id="neighborhood" required value={address.neighborhood} onChange={e => setAddress({...address, neighborhood: e.target.value})} />
+                <Label htmlFor="neighborhood" className="text-xs font-bold text-slate-600">Bairro</Label>
+                <Input id="neighborhood" required value={address.neighborhood} onChange={e => setAddress({...address, neighborhood: e.target.value})} className="rounded-xl border-slate-200 h-10" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="city">Cidade</Label>
-                <Input id="city" required value={address.city} onChange={e => setAddress({...address, city: e.target.value})} />
+                <Label htmlFor="city" className="text-xs font-bold text-slate-600">Cidade</Label>
+                <Input id="city" required value={address.city} onChange={e => setAddress({...address, city: e.target.value})} className="rounded-xl border-slate-200 h-10" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="state">Estado</Label>
-                <Input id="state" required value={address.state} onChange={e => setAddress({...address, state: e.target.value})} />
+                <Label htmlFor="state" className="text-xs font-bold text-slate-600">Estado</Label>
+                <Input id="state" required value={address.state} onChange={e => setAddress({...address, state: e.target.value})} className="rounded-xl border-slate-200 h-10" />
               </div>
+            </div>
+
+            {/* Dynamic Shipping Selection Row */}
+            <div className="pt-4 border-t border-slate-100">
+              {calculatingShipping && (
+                <div className="text-xs text-blue-600 font-semibold animate-pulse py-4 flex items-center gap-2 justify-center bg-blue-50/50 rounded-xl border border-blue-105">
+                  <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                  <span>Obtendo cotações de entrega integrada Melhor Envio...</span>
+                </div>
+              )}
+
+              {shippingOptions.length > 0 && !calculatingShipping && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Formas de Envio Disponíveis</h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    {shippingOptions.map((opt: any) => {
+                      const isSelected = selectedShippingOption?.id === opt.id;
+                      return (
+                        <div 
+                          key={opt.id} 
+                          onClick={() => setSelectedShippingOption(opt)}
+                          className={`flex justify-between items-center p-3.5 border rounded-2xl cursor-pointer transition-all ${
+                            isSelected 
+                              ? 'border-blue-600 bg-blue-50/40 border-2 ring-1 ring-blue-500/20 shadow-sm' 
+                              : 'border-slate-200 bg-white hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input 
+                              type="radio" 
+                              checked={isSelected} 
+                              onChange={() => setSelectedShippingOption(opt)}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500" 
+                            />
+                            <div className="text-left">
+                              <span className="font-bold text-xs block text-slate-800">{opt.name}</span>
+                              <span className="text-[10px] text-slate-400">{opt.days} dias úteis</span>
+                            </div>
+                          </div>
+                          <span className="text-xs font-extrabold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(opt.price)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {address.zipCode.replace(/\D/g, '').length === 8 && shippingOptions.length === 0 && !calculatingShipping && (
+                <div className="text-xs text-amber-600 font-semibold py-3 flex items-center gap-2 justify-center bg-amber-50 rounded-xl border border-amber-200">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>Nenhum frete real retornado. Certifique-se de que a API está conectada.</span>
+                </div>
+              )}
             </div>
           </section>
         </div>
 
         <div className="space-y-8">
-          <section className="bg-surface-elevated/50 p-8 rounded-[2rem] space-y-6">
-            <h2 className="text-xl font-bold">Resumo</h2>
+          <section className="bg-slate-900 text-white p-8 rounded-[2rem] shadow-xl space-y-6">
+            <h2 className="text-xl font-bold border-b border-slate-800 pb-4">Resumo da Compra</h2>
             <div className="space-y-4">
               {items.map(item => (
                 <div key={item.productId} className="flex justify-between text-sm">
-                  <span>{item.quantity}x {item.name}</span>
+                  <span className="text-slate-300">{item.quantity}x {item.name}</span>
                   <span className="font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.quantity)}</span>
                 </div>
               ))}
-              <Separator />
+              
+              <Separator className="bg-slate-800" />
+              
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Subtotal</span>
+                <span className="font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
+              </div>
+
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">Frete Integrado</span>
+                <span className="font-semibold text-blue-400">
+                  {selectedShippingOption 
+                    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedShippingPrice)
+                    : "Selecione o CEP de entrega"}
+                </span>
+              </div>
+
+              <Separator className="bg-slate-800" />
+
               <div className="flex justify-between text-lg font-black pt-2">
-                <span>Total</span>
-                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
+                <span>Total Final</span>
+                <span className="text-blue-400 font-mono">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalTotalAmount)}</span>
               </div>
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full h-14 bg-ocean rounded-2xl font-bold text-lg">
+            <Button type="submit" disabled={loading || !selectedShippingOption} className="w-full h-14 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:bg-slate-850 rounded-2xl font-bold text-lg cursor-pointer transition-all">
               {loading ? 'Processando...' : 'Finalizar Pedido'}
             </Button>
             
-            <p className="text-xs text-center text-muted-foreground">
+            <p className="text-[10px] text-center text-slate-400">
               Ao clicar em finalizar, você verá a chave PIX e as instruções para conclusão do seu pagamento.
             </p>
           </section>
