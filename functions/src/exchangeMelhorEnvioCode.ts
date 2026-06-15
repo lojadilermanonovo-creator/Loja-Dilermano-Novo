@@ -7,19 +7,36 @@ export const exchangeMelhorEnvioCode = onCall({
 }, async (request: CallableRequest) => {
   const { code, redirectUri } = request.data;
 
+  console.log("[MELHOR_ENVIO] Function invoked. Has auth:", !!request.auth, "Has code:", !!code);
+  if (request.auth) {
+    console.log("[MELHOR_ENVIO] User email:", request.auth.token.email);
+  }
+
   // Ensure user is signed in and is an administrator
   if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Authentication required.");
+    console.warn("[MELHOR_ENVIO] Access rejected: unauthenticated");
+    return {
+      success: false,
+      error: "UNAUTHENTICATED (401): Você precisa estar logado para realizar esta ação."
+    };
   }
 
   // Double check admin claim or admin email
   const isAdmin = request.auth.token.admin === true || request.auth.token.email === "lojadilermanonovo@gmail.com";
   if (!isAdmin) {
-    throw new HttpsError("permission-denied", "Only administrators can configure Melhor Envio.");
+    console.warn(`[MELHOR_ENVIO] Access rejected: user ${request.auth.token.email} is not admin`);
+    return {
+      success: false,
+      error: "PERMISSION_DENIED (403): Apenas administradores podem configurar o Melhor Envio."
+    };
   }
 
   if (!code || !redirectUri) {
-    throw new HttpsError("invalid-argument", "Authorization code and redirect URI are required.");
+    console.warn("[MELHOR_ENVIO] Access rejected: missing code/redirectUri");
+    return {
+      success: false,
+      error: "INVALID_ARGUMENT (400): Código de autorização e URI de redirecionamento são obrigatórios."
+    };
   }
 
   const db = admin.firestore();
@@ -27,16 +44,26 @@ export const exchangeMelhorEnvioCode = onCall({
   // Read config
   const configSnap = await db.collection("settings").doc("melhorenvio").get();
   if (!configSnap.exists) {
-    throw new HttpsError("failed-precondition", "Melhor Envio Client ID and Secret have not been configured yet.");
+    console.error("[MELHOR_ENVIO] Error: Settings document 'settings/melhorenvio' not found");
+    return {
+      success: false,
+      error: "FAILED_PRECONDITION (412): O ID do Cliente e o Secret do Melhor Envio não foram configurados ainda."
+    };
   }
 
   const config = configSnap.data();
   if (!config || !config.clientId || !config.clientSecret) {
-    throw new HttpsError("failed-precondition", "Melhor Envio Client ID and Client Secret must be configured first.");
+    console.error("[MELHOR_ENVIO] Error: clientId or clientSecret are undefined in settings/melhorenvio");
+    return {
+      success: false,
+      error: "FAILED_PRECONDITION (412): O ID do Cliente e o Secret do Melhor Envio precisam estar preenchidos no banco de dados."
+    };
   }
 
   const isSandbox = config.mode === "sandbox";
   const baseUrl = isSandbox ? "https://sandbox.melhorenvio.com.br" : "https://melhorenvio.com.br";
+
+  console.log(`[MELHOR_ENVIO] Requesting token exchange from ${baseUrl}/oauth/token with clientId: ${config.clientId} and redirectUri: ${redirectUri}`);
 
   try {
     const response = await fetch(`${baseUrl}/oauth/token`, {
@@ -57,11 +84,15 @@ export const exchangeMelhorEnvioCode = onCall({
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Melhor Envio Token Exchange Error Response:", errorText);
-      throw new Error(`Melhor Envio responded with status ${response.status}: ${errorText}`);
+      console.error("[MELHOR_ENVIO] Token Exchange Error Response:", errorText);
+      return {
+        success: false,
+        error: `MELHOR_ENVIO_API_ERROR: O serviço Melhor Envio retornou status ${response.status}: ${errorText}`
+      };
     }
 
     const tokenData = await response.json();
+    console.log("[MELHOR_ENVIO] Code exchange took place successfully. Storing tokens...");
 
     // Store tokens securely in Firestore (Accessible only to admins via rules)
     await db.collection("settings").doc("melhorenvio_tokens").set({
@@ -72,12 +103,17 @@ export const exchangeMelhorEnvioCode = onCall({
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
+    console.log("[MELHOR_ENVIO] Token save successful.");
+
     return {
       success: true,
       expiresAt: Date.now() + (tokenData.expires_in * 1000)
     };
   } catch (error: any) {
-    console.error("Error exchanging code:", error);
-    throw new HttpsError("internal", error.message || "Failed to exchange authorization code.");
+    console.error("[MELHOR_ENVIO] Exception during code exchange:", error);
+    return {
+      success: false,
+      error: `INTERNAL_ERROR (500): ${error.message || "Falha ao obter tokens com o Melhor Envio."}`
+    };
   }
 });

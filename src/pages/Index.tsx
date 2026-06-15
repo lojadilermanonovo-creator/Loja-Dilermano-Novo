@@ -90,7 +90,9 @@ export default function Index() {
           console.log("[MELHOR_ENVIO] Token exchange success");
           toast.success('Melhor Envio conectado com sucesso!', { id: 'melhor-envio-connection' });
         } else {
-          toast.error('Falha ao concluir autenticação com Melhor Envio', { id: 'melhor-envio-connection' });
+          const errMsg = result.data?.error || 'Falha ao concluir autenticação com Melhor Envio';
+          console.error("[MELHOR_ENVIO] Falha no intercâmbio de código:", errMsg);
+          toast.error(errMsg, { id: 'melhor-envio-connection' });
         }
       } catch (err: any) {
         console.error("Erro no callback do Melhor Envio:", err);

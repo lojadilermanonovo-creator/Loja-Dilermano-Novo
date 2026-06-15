@@ -33,16 +33,14 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onUserCreated = exports.onOrderCreated = exports.setAdminClaim = exports.stripeWebhook = exports.calculateShipping = exports.createCheckout = void 0;
+exports.onUserCreated = exports.onOrderCreated = exports.setAdminClaim = exports.exchangeMelhorEnvioCode = exports.calculateShipping = void 0;
 const admin = __importStar(require("firebase-admin"));
 admin.initializeApp();
 // Export functions from separate files
-var createCheckout_1 = require("./createCheckout");
-Object.defineProperty(exports, "createCheckout", { enumerable: true, get: function () { return createCheckout_1.createCheckout; } });
 var calculateShipping_1 = require("./calculateShipping");
 Object.defineProperty(exports, "calculateShipping", { enumerable: true, get: function () { return calculateShipping_1.calculateShipping; } });
-var stripeWebhook_1 = require("./stripeWebhook");
-Object.defineProperty(exports, "stripeWebhook", { enumerable: true, get: function () { return stripeWebhook_1.stripeWebhook; } });
+var exchangeMelhorEnvioCode_1 = require("./exchangeMelhorEnvioCode");
+Object.defineProperty(exports, "exchangeMelhorEnvioCode", { enumerable: true, get: function () { return exchangeMelhorEnvioCode_1.exchangeMelhorEnvioCode; } });
 var setAdminClaim_1 = require("./setAdminClaim");
 Object.defineProperty(exports, "setAdminClaim", { enumerable: true, get: function () { return setAdminClaim_1.setAdminClaim; } });
 // Database Triggers
