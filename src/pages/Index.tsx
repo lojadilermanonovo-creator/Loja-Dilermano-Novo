@@ -3,7 +3,7 @@ import HeroCarousel from '@/src/components/HeroCarousel';
 import CategoryCard from '@/src/components/CategoryCard';
 import ProductCard from '@/src/components/ProductCard';
 import { db, functions } from '@/src/integrations/firebase/client';
-import { collection, query, where, getDocs, limit, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy, doc, onSnapshot } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -82,15 +82,7 @@ export default function Index() {
         const newSnap = await getDocs(newQuery);
         setNewProducts(newSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
 
-        // Fetch Promo CTA Settings
-        try {
-          const promoSnap = await getDoc(doc(db, 'settings', 'promocta'));
-          if (promoSnap.exists()) {
-            setPromoCTA(promoSnap.data());
-          }
-        } catch (e) {
-          console.warn("Home: Could not load promo CTA settings, using defaults.", e);
-        }
+        // Fetch Promo CTA Settings is now handled via real-time onSnapshot below
       } catch (err: any) {
         // Check for "Database not found" specifically to avoid noisy errors
         if (err?.message?.includes('Database') && err?.message?.includes('not found')) {
@@ -102,6 +94,22 @@ export default function Index() {
     };
 
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'promocta'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setPromoCTA((prev: any) => ({
+          ...prev,
+          ...data
+        }));
+      }
+    }, (err) => {
+      console.warn("Home: Could not listen to promo CTA settings, using defaults.", err);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const code = searchParams.get('code');
