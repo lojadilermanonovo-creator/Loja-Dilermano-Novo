@@ -7,14 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { db, functions } from '@/src/integrations/firebase/client';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, runTransaction, doc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, MapPin, Truck, AlertCircle } from 'lucide-react';
+import { RefreshCw, MapPin, Truck, AlertCircle, Tag } from 'lucide-react';
 import { calculateShippingMock } from '@/src/utils/shipping';
 
 export default function CheckoutPage() {
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal, clearCart, appliedCoupon, discountAmount } = useCart();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -78,7 +78,7 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const shippingCost = selectedShippingOption ? selectedShippingOption.price : 0;
-      const totalAmount = subtotal + shippingCost;
+      const totalAmount = Math.max(subtotal - discountAmount, 0) + shippingCost;
 
       const orderData = {
         userId: user.uid,
@@ -91,6 +91,10 @@ export default function CheckoutPage() {
           days: selectedShippingOption.days,
           company: selectedShippingOption.company || selectedShippingOption.name
         } : null,
+        couponCode: appliedCoupon ? appliedCoupon.code : null,
+        couponType: appliedCoupon ? appliedCoupon.type : null,
+        couponValue: appliedCoupon ? appliedCoupon.value : null,
+        discountAmount: discountAmount,
         total: totalAmount,
         shippingAddress: {
           ...address,
@@ -102,22 +106,65 @@ export default function CheckoutPage() {
         orderNumber: `DI-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000)}`
       };
 
-      const docRef = await addDoc(collection(db, 'orders'), orderData);
+      let orderId = '';
+
+      if (appliedCoupon) {
+        // Concurrency Control using Firestore Transaction
+        await runTransaction(db, async (transaction) => {
+          const couponRef = doc(db, 'coupons', appliedCoupon.code);
+          const couponSnap = await transaction.get(couponRef);
+
+          if (!couponSnap.exists()) {
+            throw new Error('Cupom não encontrado ou indisponível.');
+          }
+
+          const currentCoupon = couponSnap.data();
+
+          if (!currentCoupon.isActive) {
+            throw new Error('O cupom aplicado não está mais ativo.');
+          }
+
+          if (currentCoupon.maxUses !== undefined && currentCoupon.usedCount !== undefined) {
+            if (currentCoupon.usedCount >= currentCoupon.maxUses) {
+              throw new Error('O limite de uso deste cupom se esgotou enquanto você finalizava a compra.');
+            }
+          }
+
+          if (currentCoupon.minOrderValue !== undefined && subtotal < currentCoupon.minOrderValue) {
+            throw new Error(`Este cupom requer um valor mínimo de compra de R$ ${Number(currentCoupon.minOrderValue).toFixed(2)}.`);
+          }
+
+          // Atomically update coupon consumed slots count
+          transaction.update(couponRef, {
+            usedCount: (currentCoupon.usedCount || 0) + 1
+          });
+
+          // Atomically create the order document
+          const newOrderRef = doc(collection(db, 'orders'));
+          transaction.set(newOrderRef, orderData);
+          orderId = newOrderRef.id;
+        });
+      } else {
+        // Simple order creation when no coupon is applied
+        const docRef = await addDoc(collection(db, 'orders'), orderData);
+        orderId = docRef.id;
+      }
       
       toast.success('Pedido criado com sucesso! Siga as instruções de pagamento.');
       
       clearCart();
-      navigate(`/checkout/success?orderId=${docRef.id}`);
+      navigate(`/checkout/success?orderId=${orderId}`);
 
-    } catch (error) {
-      toast.error('Erro ao processar checkout');
+    } catch (error: any) {
+      console.error('Erro no checkout:', error);
+      toast.error(error.message || 'Erro ao processar checkout');
     } finally {
       setLoading(false);
     }
   };
 
   const selectedShippingPrice = selectedShippingOption ? selectedShippingOption.price : 0;
-  const finalTotalAmount = subtotal + selectedShippingPrice;
+  const finalTotalAmount = Math.max(subtotal - discountAmount, 0) + selectedShippingPrice;
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-6xl">
@@ -241,6 +288,18 @@ export default function CheckoutPage() {
                 <span className="text-slate-400">Subtotal</span>
                 <span className="font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
               </div>
+
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm text-rose-400 font-semibold bg-rose-950/20 p-2.5 rounded-xl border border-rose-900/30">
+                  <span className="flex items-center gap-1.5 uppercase text-xs font-extrabold text-rose-300">
+                    <Tag className="h-3.5 w-3.5 text-rose-400" />
+                    Cupom ({appliedCoupon?.code})
+                  </span>
+                  <span className="font-mono">
+                    -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountAmount)}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">Frete Integrado</span>

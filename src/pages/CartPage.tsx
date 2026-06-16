@@ -1,18 +1,65 @@
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '@/src/contexts/CartContext';
 import { useFreeShippingThreshold } from '@/src/hooks/useFreeShippingThreshold';
 import { Button } from '@/components/ui/button';
-import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Truck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Truck, Tag, X } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { motion } from 'motion/react';
+import { toast } from 'sonner';
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem, subtotal } = useCart();
+  const { 
+    items, 
+    updateQuantity, 
+    removeItem, 
+    subtotal, 
+    appliedCoupon, 
+    applyCoupon, 
+    removeCoupon, 
+    discountAmount 
+  } = useCart();
   const freeShippingThreshold = useFreeShippingThreshold();
   const navigate = useNavigate();
 
-  const freeShippingProgress = Math.min((subtotal / freeShippingThreshold) * 100, 100);
+  const [couponCode, setCouponCode] = useState('');
+  const [applying, setApplying] = useState(false);
+
+  const freeShippingProgress = freeShippingThreshold <= 0 
+    ? 100 
+    : Math.min((subtotal / freeShippingThreshold) * 100, 100);
+    
   const remainingForFreeShipping = Math.max(freeShippingThreshold - subtotal, 0);
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponCode.trim()) {
+      toast.error('Informe o código do cupom.');
+      return;
+    }
+    setApplying(true);
+    try {
+      const res = await applyCoupon(couponCode);
+      if (res.success) {
+        toast.success(res.message);
+        setCouponCode('');
+      } else {
+        toast.error(res.message);
+      }
+    } catch (err) {
+      toast.error('Erro ao processar cupom.');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    removeCoupon();
+    toast.success('Cupom removido com sucesso!');
+  };
+
+  const finalTotal = Math.max(subtotal - discountAmount, 0);
 
   if (items.length === 0) {
     return (
@@ -120,16 +167,62 @@ export default function CartPage() {
                 <span className="text-muted-foreground">Subtotal</span>
                 <span className="font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
               </div>
+              
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-sm text-rose-600 font-semibold bg-rose-50/50 p-2.5 rounded-xl border border-rose-100 flex-col gap-1">
+                  <div className="flex justify-between items-center w-full">
+                    <span className="flex items-center gap-1.5 text-xs uppercase font-extrabold">
+                      <Tag className="h-3.5 w-3.5 text-rose-500" />
+                      Cupom: {appliedCoupon?.code}
+                    </span>
+                    <span className="font-mono text-sm">
+                      -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discountAmount)}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={handleRemoveCoupon}
+                    className="text-[10px] text-rose-500 underline text-left hover:text-rose-600 w-fit cursor-pointer flex items-center gap-0.5 mt-0.5"
+                  >
+                    <X className="h-3 w-3" /> Remover Cupom
+                  </button>
+                </div>
+              )}
+
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Frete</span>
                 <span className="font-medium text-ocean">{remainingForFreeShipping === 0 ? 'Grátis' : 'Calculado no checkout'}</span>
               </div>
+              
               <Separator />
+              
               <div className="flex justify-between text-xl font-black">
                 <span>Total</span>
-                <span className="text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
+                <span className="text-primary font-mono">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalTotal)}</span>
               </div>
             </div>
+
+            {/* Coupon Application Input Section */}
+            {!appliedCoupon && (
+              <form onSubmit={handleApplyCoupon} className="space-y-2 pt-2 border-t border-dashed border-slate-200">
+                <label className="text-xs font-extrabold uppercase text-slate-500 tracking-wider block">Cupom de Desconto</label>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="DIGITE SEU CUPOM" 
+                    value={couponCode} 
+                    onChange={e => setCouponCode(e.target.value)}
+                    disabled={applying}
+                    className="rounded-xl border-slate-200 h-10 font-mono tracking-wider uppercase text-xs text-slate-800 placeholder:text-slate-400 font-semibold bg-white"
+                  />
+                  <Button 
+                    type="submit" 
+                    disabled={applying} 
+                    className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 text-xs px-4 font-bold h-10 cursor-pointer shrink-0 transition-colors"
+                  >
+                    {applying ? '...' : 'Aplicar'}
+                  </Button>
+                </div>
+              </form>
+            )}
 
             <Button 
                size="lg" 

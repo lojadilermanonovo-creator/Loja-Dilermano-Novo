@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   ArrowLeft, Clock, MapPin, User, Package, Truck, 
-  ExternalLink, Calendar, CheckCircle2, DollarSign, XCircle, AlertCircle
+  ExternalLink, Calendar, CheckCircle2, DollarSign, XCircle, AlertCircle, Tag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -302,14 +302,29 @@ export default function OrderDetails() {
               <div className="p-6 bg-slate-50/50 border-t border-slate-150 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <p className="text-xs text-slate-500 font-medium">Frete e coleta inclusos sob responsabilidade da loja.</p>
                 
-                <div className="w-full sm:w-[240px] text-xs space-y-2">
+                <div className="w-full sm:w-[260px] text-xs space-y-2">
                   <div className="flex justify-between text-slate-500 font-semibold">
                     <span>Itens ({order.items?.length || 0}):</span>
                     <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.subtotal || order.total || 0)}</span>
                   </div>
+                  
+                  {order.discountAmount && order.discountAmount > 0 ? (
+                    <div className="flex justify-between text-rose-600 font-semibold">
+                      <span className="flex items-center gap-1">
+                        <Tag className="h-3 w-3" />
+                        Desconto ({order.couponCode}):
+                      </span>
+                      <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.discountAmount)}</span>
+                    </div>
+                  ) : null}
+
                   <div className="flex justify-between text-slate-500 font-semibold pb-1.5 border-b border-slate-200">
                     <span>Envio:</span>
-                    <span className="text-emerald-600 font-extrabold uppercase">Grátis</span>
+                    <span className={order.shippingCost && order.shippingCost > 0 ? "font-bold text-slate-700" : "text-emerald-600 font-extrabold uppercase"}>
+                      {order.shippingCost && order.shippingCost > 0 
+                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.shippingCost)
+                        : "Grátis"}
+                    </span>
                   </div>
                   <div className="flex justify-between text-slate-900 font-black text-base pt-1">
                     <span>Total Pago:</span>

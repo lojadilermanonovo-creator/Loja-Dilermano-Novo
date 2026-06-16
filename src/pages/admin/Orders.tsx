@@ -673,48 +673,7 @@ export default function AdminOrders() {
                 </DialogDescription>
               </div>
 
-              {/* Status selectors in Drawer top */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {selectedOrder && (
-                  <>
-                    <div className="flex flex-col items-end mr-1">
-                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Transporte</span>
-                      <Select 
-                        value={selectedOrder.status} 
-                        onValueChange={(val) => updateStatus(selectedOrder.id, val)}
-                      >
-                        <SelectTrigger className="h-8 w-[125px] rounded-full border border-slate-200 text-xs bg-white text-slate-700">
-                          <SelectValue>{selectedOrder.status}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pendente</SelectItem>
-                          <SelectItem value="paid">Pago</SelectItem>
-                          <SelectItem value="processing">Processando</SelectItem>
-                          <SelectItem value="shipped">Enviado</SelectItem>
-                          <SelectItem value="delivered">Entregue</SelectItem>
-                          <SelectItem value="cancelled">Cancelado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex flex-col items-end">
-                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Pagamento</span>
-                      <Select 
-                        value={selectedOrder.paymentStatus} 
-                        onValueChange={(val) => updatePaymentStatus(selectedOrder.id, val === 'paid')}
-                      >
-                        <SelectTrigger className="h-8 w-[110px] rounded-full border border-slate-200 text-xs bg-white text-slate-700">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pendente</SelectItem>
-                          <SelectItem value="paid">Pago</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                )}
-              </div>
+              {/* Status selectors in Drawer top removed per request */}
             </div>
           </DialogHeader>
 
@@ -893,9 +852,23 @@ export default function AdminOrders() {
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedOrder?.subtotal || selectedOrder?.total || 0)}
                   </span>
                 </div>
+                
+                {selectedOrder?.discountAmount && selectedOrder.discountAmount > 0 ? (
+                  <div className="flex justify-between text-rose-600 font-semibold animate-in">
+                    <span>Desconto (Cupom {selectedOrder.couponCode}):</span>
+                    <span>
+                      -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedOrder.discountAmount)}
+                    </span>
+                  </div>
+                ) : null}
+
                 <div className="flex justify-between text-slate-500 font-medium pb-2 border-b border-slate-150">
-                  <span>Frete Extra:</span>
-                  <span className="font-bold text-emerald-600">Grátis</span>
+                  <span>Frete:</span>
+                  <span className={`font-bold ${typeof selectedOrder?.shippingCost !== 'undefined' && Number(selectedOrder.shippingCost) > 0 ? 'text-slate-700' : 'text-emerald-600'}`}>
+                    {typeof selectedOrder?.shippingCost !== 'undefined' && Number(selectedOrder.shippingCost) > 0 
+                      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedOrder.shippingCost))
+                      : 'Grátis'}
+                  </span>
                 </div>
                 <div className="flex justify-between text-base font-black text-slate-900 pt-1">
                   <span>Valor Total:</span>

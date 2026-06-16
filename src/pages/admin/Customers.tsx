@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { db } from '@/src/integrations/firebase/client';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Users, ShieldAlert, Phone, Mail, FileText, Trash2, CalendarCheck } from 'lucide-react';
+import { Search, Users, ShieldAlert, Phone, Mail, FileText, Trash2, CalendarCheck, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AdminCustomers() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -41,9 +42,77 @@ export default function AdminCustomers() {
     }
   };
 
+  const handleSyncFromOrders = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      // 1. Fetch existing users
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const existingUserIds = new Set(usersSnap.docs.map(doc => doc.id));
+
+      // 2. Fetch existing orders
+      const ordersSnap = await getDocs(collection(db, 'orders'));
+      const ordersDocs = ordersSnap.docs.map(doc => doc.data());
+
+      // 3. Find unique userIds in orders that are not registered in the users directory
+      const usersToCreateMap = new Map<string, any>();
+
+      ordersDocs.forEach(order => {
+        const userId = order.userId;
+        if (userId && !existingUserIds.has(userId) && !usersToCreateMap.has(userId)) {
+          const shipping = order.shippingAddress || {};
+          const billing = order.billingAddress || {};
+
+          const fullName = shipping.fullName || billing.fullName || order.customerName || 'Cliente Sincronizado';
+          const email = shipping.email || billing.email || order.customerEmail || '';
+          const phone = shipping.phone || billing.phone || '';
+
+          usersToCreateMap.set(userId, {
+            uid: userId,
+            email: email,
+            fullName: fullName,
+            phone: phone,
+            createdAt: order.createdAt || serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            isSyncedProfile: true
+          });
+        }
+      });
+
+      const totalFoundInOrders = new Set(ordersDocs.map(o => o.userId).filter(Boolean)).size;
+      const countToCreate = usersToCreateMap.size;
+
+      if (countToCreate === 0) {
+        toast.info(`Nenhum cliente ausente nos pedidos! Todos os ${totalFoundInOrders} clientes já constam no banco.`);
+        setSyncing(false);
+        return;
+      }
+
+      // 4. Create missing profile documents
+      let createdCount = 0;
+      for (const [uid, userData] of usersToCreateMap.entries()) {
+        try {
+          await setDoc(doc(db, 'users', uid), userData);
+          createdCount++;
+        } catch (err) {
+          console.error(`Erro ao sincronizar usuário ${uid}:`, err);
+        }
+      }
+
+      toast.success(`Sincronização concluída! ${createdCount} novos perfis criados de ${totalFoundInOrders} identificados nos pedidos.`);
+      await fetchCustomers();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Erro ao sincronizar registros: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const filtered = customers.filter(c => {
     const term = searchTerm.toLowerCase();
     return (
+      (c.fullName || '').toLowerCase().includes(term) ||
       (c.name || '').toLowerCase().includes(term) ||
       (c.email || '').toLowerCase().includes(term) ||
       (c.phone || '').toLowerCase().includes(term) ||
@@ -62,6 +131,16 @@ export default function AdminCustomers() {
           <p className="text-slate-500 mt-1">
             Lista e controle de perfis de compradores integrados pelo Firebase Auth.
           </p>
+        </div>
+        <div className="flex shrink-0">
+          <Button 
+            onClick={handleSyncFromOrders} 
+            disabled={syncing}
+            className="bg-indigo-600 hover:bg-indigo-700 h-11 px-5 rounded-xl text-white font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-sm"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Sincronizando...' : 'Sincronizar Clientes dos Pedidos'}
+          </Button>
         </div>
       </div>
 
@@ -144,7 +223,7 @@ export default function AdminCustomers() {
                 return (
                   <TableRow key={client.id} className="hover:bg-slate-50/40 transition-colors">
                     <TableCell className="pl-6 py-4">
-                      <div className="font-bold text-slate-900 text-sm">{client.name || 'Sem nome cadastrado'}</div>
+                      <div className="font-bold text-slate-900 text-sm">{client.fullName || client.name || 'Sem nome cadastrado'}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">UID: {client.id}</div>
                     </TableCell>
 

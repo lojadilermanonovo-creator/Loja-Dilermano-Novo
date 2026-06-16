@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { auth } from '@/src/integrations/firebase/client';
+import { auth, db } from '@/src/integrations/firebase/client';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +35,25 @@ export default function Login() {
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (!userDocSnap.exists()) {
+          await setDoc(userDocRef, {
+            uid: user.uid,
+            email: user.email,
+            fullName: user.displayName || user.email?.split('@')[0] || 'Google User',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } catch (dbErr: any) {
+        console.error("Login: Error verifying/creating profile doc:", dbErr);
+      }
+
       toast.success('Login com Google realizado com sucesso!');
       navigate(redirect);
     } catch (error: any) {
