@@ -15,6 +15,7 @@ import CheckoutPage from '@/src/pages/CheckoutPage';
 import CheckoutSuccess from '@/src/pages/CheckoutSuccess';
 import MyAccount from '@/src/pages/MyAccount';
 import MyOrders from '@/src/pages/MyOrders';
+import OrderDetails from '@/src/pages/OrderDetails';
 import Login from '@/src/pages/Login';
 import Register from '@/src/pages/Register';
 import ForgotPassword from '@/src/pages/ForgotPassword';
@@ -81,6 +82,7 @@ export default function App() {
                   <Route element={<ProtectedRoute />}>
                     <Route path="/conta" element={<MyAccount />} />
                     <Route path="/meus-pedidos" element={<MyOrders />} />
+                    <Route path="/meus-pedidos/:orderId" element={<OrderDetails />} />
                   </Route>
                   
                   <Route path="*" element={<NotFound />} />

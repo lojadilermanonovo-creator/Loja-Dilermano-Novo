@@ -9,20 +9,32 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { toast } from 'sonner';
 import { 
   Settings, Save, Phone, QrCode, MapPin, Store, 
-  Globe, Key, RefreshCw, AlertCircle, CheckCircle2, Truck 
+  Globe, Key, RefreshCw, AlertCircle, CheckCircle2, Truck,
+  Megaphone, Palette
 } from 'lucide-react';
 
 export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'melhorenvio'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'melhorenvio' | 'promocta'>('general');
 
   // States for general config
   const [storeName, setStoreName] = useState('Dilermando Store');
   const [whatsapp, setWhatsapp] = useState('');
   const [pixKey, setPixKey] = useState('');
   const [pickupAddress, setPickupAddress] = useState('');
+
+  // States for Promo CTA
+  const [ctaActive, setCtaActive] = useState(true);
+  const [ctaTitle, setCtaTitle] = useState('Frete Grátis acima de R$ {valor}');
+  const [ctaSubtitle, setCtaSubtitle] = useState('Aproveite para renovar seu guarda-roupa sem se preocupar com a entrega. Parcele em até {parcelas} sem juros.');
+  const [ctaValue, setCtaValue] = useState<number | ''>(299);
+  const [ctaInstallments, setCtaInstallments] = useState<number | ''>(5);
+  const [ctaButtonText, setCtaButtonText] = useState('Aproveitar Agora');
+  const [ctaButtonLink, setCtaButtonLink] = useState('/categoria/promocoes');
+  const [ctaBgColor, setCtaBgColor] = useState('#2563EB');
+  const [ctaTextColor, setCtaTextColor] = useState('#FFFFFF');
 
   // States for Melhor Envio
   const [meClientId, setMeClientId] = useState('');
@@ -78,6 +90,31 @@ export default function AdminSettings() {
         setMeConnected(false);
         setMeExpiresAt(null);
       }
+
+      // 4. Promo CTA Settings
+      const promoSnap = await getDoc(doc(db, 'settings', 'promocta'));
+      if (promoSnap.exists()) {
+        const data = promoSnap.data();
+        setCtaActive(data.active !== undefined ? data.active : true);
+        setCtaTitle(data.title !== undefined ? data.title : 'Frete Grátis acima de R$ {valor}');
+        setCtaSubtitle(data.subtitle !== undefined ? data.subtitle : 'Aproveite para renovar seu guarda-roupa sem se preocupar com a entrega. Parcele em até {parcelas} sem juros.');
+        setCtaValue(data.value !== undefined ? data.value : 299);
+        setCtaInstallments(data.installments !== undefined ? data.installments : 5);
+        setCtaButtonText(data.buttonText !== undefined ? data.buttonText : 'Aproveitar Agora');
+        setCtaButtonLink(data.buttonLink !== undefined ? data.buttonLink : '/categoria/promocoes');
+        setCtaBgColor(data.bgColor !== undefined ? data.bgColor : '#2563EB');
+        setCtaTextColor(data.textColor !== undefined ? data.textColor : '#FFFFFF');
+      } else {
+        setCtaActive(true);
+        setCtaTitle('Frete Grátis acima de R$ {valor}');
+        setCtaSubtitle('Aproveite para renovar seu guarda-roupa sem se preocupar com a entrega. Parcele em até {parcelas} sem juros.');
+        setCtaValue(299);
+        setCtaInstallments(5);
+        setCtaButtonText('Aproveitar Agora');
+        setCtaButtonLink('/categoria/promocoes');
+        setCtaBgColor('#2563EB');
+        setCtaTextColor('#FFFFFF');
+      }
     } catch (e) {
       console.error(e);
       toast.error('Erro ao buscar as configurações do sistema');
@@ -106,6 +143,43 @@ export default function AdminSettings() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSavePromoCTA = async () => {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'promocta'), {
+        active: ctaActive,
+        title: ctaTitle,
+        subtitle: ctaSubtitle,
+        value: ctaValue === '' ? '' : Number(ctaValue),
+        installments: ctaInstallments === '' ? '' : Number(ctaInstallments),
+        buttonText: ctaButtonText,
+        buttonLink: ctaButtonLink,
+        bgColor: ctaBgColor,
+        textColor: ctaTextColor,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success('Configurações do Banner Promocional atualizadas com sucesso!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao salvar as configurações do Banner Promocional');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRestorePromoDefaults = () => {
+    setCtaActive(true);
+    setCtaTitle('Frete Grátis acima de R$ {valor}');
+    setCtaSubtitle('Aproveite para renovar seu guarda-roupa sem se preocupar com a entrega. Parcele em até {parcelas} sem juros.');
+    setCtaValue(299);
+    setCtaInstallments(5);
+    setCtaButtonText('Aproveitar Agora');
+    setCtaButtonLink('/categoria/promocoes');
+    setCtaBgColor('#2563EB');
+    setCtaTextColor('#FFFFFF');
+    toast.info('Valores padrão preenchidos. Clique em "Salvar Alterações" para gravar.');
   };
 
   const handleSaveMelhorEnvio = async () => {
@@ -172,6 +246,25 @@ export default function AdminSettings() {
     }
   };
 
+  const resolvePlaceholders = (text: string, value: number | '', installments: number | '') => {
+    if (!text) return '';
+    let result = text;
+    if (value !== '') {
+      const formattedVal = typeof value === 'number' 
+        ? value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) 
+        : String(value);
+      result = result.replace(/\{valor\}/g, formattedVal);
+    } else {
+      result = result.replace(/\{valor\}/g, '');
+    }
+    if (installments !== '') {
+      result = result.replace(/\{parcelas\}/g, `${installments}x`);
+    } else {
+      result = result.replace(/\{parcelas\}/g, '');
+    }
+    return result;
+  };
+
   return (
     <div className="space-y-8 p-6 md:p-10 max-w-4xl mx-auto">
       {/* Header */}
@@ -188,10 +281,10 @@ export default function AdminSettings() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 gap-4">
+      <div className="flex border-b border-slate-200 gap-4 overflow-x-auto">
         <button
           onClick={() => setActiveTab('general')}
-          className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors border-b-2 ${
+          className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
             activeTab === 'general'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -200,8 +293,18 @@ export default function AdminSettings() {
           Configurações Gerais
         </button>
         <button
+          onClick={() => setActiveTab('promocta')}
+          className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
+            activeTab === 'promocta'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Banner Promocional (CTA)
+        </button>
+        <button
           onClick={() => setActiveTab('melhorenvio')}
-          className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors border-b-2 ${
+          className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
             activeTab === 'melhorenvio'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -218,7 +321,7 @@ export default function AdminSettings() {
         </div>
       ) : (
         <div className="space-y-6">
-          {activeTab === 'general' ? (
+          {activeTab === 'general' && (
             <div className="space-y-6">
               {/* Card Config Geral */}
               <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -327,7 +430,238 @@ export default function AdminSettings() {
                 </Button>
               </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'promocta' && (
+            <div className="space-y-6">
+              {/* Card Banner Promocional CTA */}
+              <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50 border-b p-6">
+                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <Megaphone className="h-4.5 w-4.5 text-blue-500" /> Banner Promocional (CTA)
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Controle o banner promocional exibido na página inicial imediatamente antes do rodapé.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  {/* Switch Active */}
+                  <div className="flex items-center space-x-3 h-12 bg-slate-50 border border-slate-150 p-4 rounded-xl shadow-sm">
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input 
+                        id="cta-active"
+                        type="checkbox" 
+                        checked={ctaActive} 
+                        onChange={(e) => setCtaActive(e.target.checked)} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full.5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-blue-600"></div>
+                      <span className="ml-3 text-xs font-bold text-slate-700">Ativar Banner na Home</span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Title */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cta-title" className="text-xs font-semibold text-slate-700">Título *</Label>
+                      <Input 
+                        id="cta-title" 
+                        value={ctaTitle} 
+                        onChange={(e) => setCtaTitle(e.target.value)}
+                        placeholder="Ex: Frete Grátis acima de R$ {valor}"
+                        className="rounded-xl border-slate-200 h-10 bg-white" 
+                        required
+                      />
+                      <p className="text-[10px] text-slate-400">Use <code className="font-mono bg-slate-100 px-1 rounded">{`{valor}`}</code> para exibir o valor dinamicamente.</p>
+                    </div>
+
+                    {/* Value */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cta-value" className="text-xs font-semibold text-slate-700">Valor (R$)</Label>
+                      <Input 
+                        id="cta-value" 
+                        type="number" 
+                        value={ctaValue} 
+                        onChange={(e) => setCtaValue(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="Ex: 50"
+                        className="rounded-xl border-slate-200 h-10 bg-white" 
+                      />
+                      <p className="text-[10px] text-slate-400">Gera o formato R$ e substitui o placeholder.</p>
+                    </div>
+                  </div>
+
+                  {/* Subtitle */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cta-subtitle" className="text-xs font-semibold text-slate-700">Subtítulo</Label>
+                    <textarea 
+                      id="cta-subtitle" 
+                      rows={3}
+                      value={ctaSubtitle} 
+                      onChange={(e) => setCtaSubtitle(e.target.value)}
+                      placeholder="Ex: Aproveite condições especiais em toda a loja. Parcele em até {parcelas} sem juros."
+                      className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans" 
+                    />
+                    <p className="text-[10px] text-slate-400">Use <code className="font-mono bg-slate-100 px-1 rounded">{`{parcelas}`}</code> para exibir o número de parcelas dinamicamente.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Installments */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cta-installments" className="text-xs font-semibold text-slate-705">Número de Parcelas</Label>
+                      <Input 
+                        id="cta-installments" 
+                        type="number" 
+                        value={ctaInstallments} 
+                        onChange={(e) => setCtaInstallments(e.target.value === '' ? '' : Math.floor(Number(e.target.value)))}
+                        placeholder="Ex: 5"
+                        className="rounded-xl border-slate-200 h-10 bg-white" 
+                      />
+                    </div>
+
+                    {/* Button Text */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cta-btn-text" className="text-xs font-semibold text-slate-705">Texto do Botão</Label>
+                      <Input 
+                        id="cta-btn-text" 
+                        value={ctaButtonText} 
+                        onChange={(e) => setCtaButtonText(e.target.value)}
+                        placeholder="Ex: Comprar Agora"
+                        className="rounded-xl border-slate-200 h-10 bg-white" 
+                      />
+                    </div>
+
+                    {/* Button Link */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cta-btn-link" className="text-xs font-semibold text-slate-705">Link do Botão</Label>
+                      <Input 
+                        id="cta-btn-link" 
+                        value={ctaButtonLink} 
+                        onChange={(e) => setCtaButtonLink(e.target.value)}
+                        placeholder="Ex: /categoria/novidades"
+                        className="rounded-xl border-slate-200 h-10 bg-white" 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Colors */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cta-bgcolor" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <Palette className="h-3.5 w-3.5" /> Cor de Fundo
+                      </Label>
+                      <div className="flex gap-2">
+                        <input 
+                          id="cta-bgcolor" 
+                          type="color" 
+                          value={ctaBgColor} 
+                          onChange={(e) => setCtaBgColor(e.target.value)}
+                          className="w-12 h-10 border border-slate-200 rounded-xl cursor-pointer bg-transparent p-0" 
+                        />
+                        <Input 
+                          id="cta-bgcolor-hex" 
+                          value={ctaBgColor} 
+                          onChange={(e) => setCtaBgColor(e.target.value)}
+                          className="rounded-xl border-slate-200 h-10 bg-white font-mono uppercase" 
+                          maxLength={7}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cta-textcolor" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <Palette className="h-3.5 w-3.5" /> Cor do Texto
+                      </Label>
+                      <div className="flex gap-2">
+                        <input 
+                          id="cta-textcolor" 
+                          type="color" 
+                          value={ctaTextColor} 
+                          onChange={(e) => setCtaTextColor(e.target.value)}
+                          className="w-12 h-10 border border-slate-200 rounded-xl cursor-pointer bg-transparent p-0" 
+                        />
+                        <Input 
+                          id="cta-textcolor-hex" 
+                          value={ctaTextColor} 
+                          onChange={(e) => setCtaTextColor(e.target.value)}
+                          className="rounded-xl border-slate-200 h-10 bg-white font-mono uppercase" 
+                          maxLength={7}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Preview Section */}
+                  <div className="border border-dashed border-slate-300 rounded-3xl p-4 bg-slate-50/50 mt-4">
+                    <p className="text-xs uppercase font-extrabold tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                      <Palette className="h-3.5 w-3.5 text-slate-400" /> Pré-visualização do Banner (Tempo Real)
+                    </p>
+                    
+                    {ctaActive ? (
+                      <div 
+                        className="rounded-[2rem] p-6 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative"
+                        style={{ backgroundColor: ctaBgColor, color: ctaTextColor }}
+                      >
+                        <div className="relative z-10 max-w-md space-y-4 text-left">
+                          <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
+                            OFERTA ESPECIAL
+                          </span>
+                          <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-none">
+                            {resolvePlaceholders(ctaTitle, ctaValue, ctaInstallments) || 'Sem Título'}
+                          </h2>
+                          <p className="text-xs opacity-90 whitespace-pre-line leading-relaxed">
+                            {resolvePlaceholders(ctaSubtitle, ctaValue, ctaInstallments) || 'Sem Subtítulo'}
+                          </p>
+                          <button 
+                            disabled 
+                            className="font-bold text-xs h-10 px-6 rounded-lg bg-white shadow-md cursor-not-allowed uppercase"
+                            style={{ backgroundColor: ctaTextColor, color: ctaBgColor }}
+                          >
+                            {ctaButtonText || 'Comprar Agora'}
+                          </button>
+                        </div>
+                        <div className="relative z-10 w-24 md:w-32 aspect-square shrink-0">
+                           <img 
+                             src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop" 
+                             alt="Oferta Especial" 
+                             className="rounded-2xl shadow-xl rotate-3 hover:rotate-0 transition-transform duration-500 w-full h-full object-cover"
+                           />
+                        </div>
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+                      </div>
+                    ) : (
+                      <div className="border border-dashed border-slate-200 rounded-[2rem] p-8 text-center text-slate-400 bg-white">
+                        <p className="text-xs font-semibold">O Banner Promocional está desativado.</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Habilite "Ativar Banner na Home" acima para pré-visualizar e exibir o banner.</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Form Confirm Bar */}
+              <div className="flex justify-between pt-4">
+                <Button 
+                  type="button"
+                  variant="outline"
+                  className="border-slate-200 hover:bg-slate-50 font-bold rounded-xl h-11 px-6 cursor-pointer"
+                  onClick={handleRestorePromoDefaults}
+                >
+                  Restaurar Padrão
+                </Button>
+
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl gap-2 h-11 px-8 cursor-pointer shadow-lg shadow-blue-500/10"
+                  onClick={handleSavePromoCTA}
+                  disabled={saving}
+                >
+                  <Save className="h-4 w-4" /> {saving ? 'Salvando...' : 'Salvar Alterações'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'melhorenvio' && (
             <div className="space-y-6">
               {/* Status Section */}
               <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -341,10 +675,8 @@ export default function AdminSettings() {
                       )}
                       <div>
                         <h3 className="text-base font-bold text-slate-800">Status da Conexão</h3>
-                        <p className="text-sm text-slate-500">
-                          {meConnected 
-                            ? 'O sistema está conectado com sucesso ao Melhor Envio. As consultas reais ao frete estão ativas!' 
-                            : 'O sistema ainda não está autenticado com o Melhor Envio. Configure as chaves abaixo e conecte.'}
+                        <p className="text-sm text-slate-500 font-semibold text-amber-600 mt-1 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                          ⚠️ Modo de Simulação Local Ativo: O checkout e a página de produto estão calculando frete offline com tabelas locais de CEPs.
                         </p>
                         {meConnected && meExpiresAt && (
                           <p className="text-xs text-slate-400 font-mono mt-1">

@@ -3,7 +3,7 @@ import HeroCarousel from '@/src/components/HeroCarousel';
 import CategoryCard from '@/src/components/CategoryCard';
 import ProductCard from '@/src/components/ProductCard';
 import { db, functions } from '@/src/integrations/firebase/client';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy, doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -14,10 +14,40 @@ export default function Index() {
   const [categories, setCategories] = useState<any[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
   const [newProducts, setNewProducts] = useState<any[]>([]);
+  const [promoCTA, setPromoCTA] = useState<any>({
+    active: true,
+    title: 'Frete Grátis acima de R$ {valor}',
+    subtitle: 'Aproveite para renovar seu guarda-roupa sem se preocupar com a entrega. Parcele em até {parcelas} sem juros.',
+    value: 299,
+    installments: 5,
+    buttonText: 'Aproveitar Agora',
+    buttonLink: '/categoria/promocoes',
+    bgColor: '#2563EB',
+    textColor: '#FFFFFF',
+  });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { loading: authLoading } = useAuth();
   const [exchangeStarted, setExchangeStarted] = useState(false);
+
+  const resolvePlaceholders = (text: string, value: number | '', installments: number | '') => {
+    if (!text) return '';
+    let result = text;
+    if (value !== '') {
+      const formattedVal = typeof value === 'number' 
+        ? value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) 
+        : String(value);
+      result = result.replace(/\{valor\}/g, formattedVal);
+    } else {
+      result = result.replace(/\{valor\}/g, '');
+    }
+    if (installments !== '') {
+      result = result.replace(/\{parcelas\}/g, `${installments}x`);
+    } else {
+      result = result.replace(/\{parcelas\}/g, '');
+    }
+    return result;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,6 +81,16 @@ export default function Index() {
         );
         const newSnap = await getDocs(newQuery);
         setNewProducts(newSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
+
+        // Fetch Promo CTA Settings
+        try {
+          const promoSnap = await getDoc(doc(db, 'settings', 'promocta'));
+          if (promoSnap.exists()) {
+            setPromoCTA(promoSnap.data());
+          }
+        } catch (e) {
+          console.warn("Home: Could not load promo CTA settings, using defaults.", e);
+        }
       } catch (err: any) {
         // Check for "Database not found" specifically to avoid noisy errors
         if (err?.message?.includes('Database') && err?.message?.includes('not found')) {
@@ -71,37 +111,10 @@ export default function Index() {
 
     const handleCallback = async () => {
       setExchangeStarted(true);
-      console.log("[MELHOR_ENVIO] Authorization Code:", code);
-      
-      try {
-        toast.loading('Iniciando conexão integrada com o Melhor Envio...', { id: 'melhor-envio-connection' });
-        
-        const redirectUri = window.location.origin.includes('localhost') || window.location.origin.includes('run.app')
-          ? window.location.origin + '/'
-          : 'https://dilermanoimport.netlify.app/';
-        
-        const exchangeFn = httpsCallable(functions, 'exchangeMelhorEnvioCode');
-        const result: any = await exchangeFn({ 
-          code, 
-          redirectUri 
-        });
-
-        if (result.data && result.data.success) {
-          console.log("[MELHOR_ENVIO] Token exchange success");
-          toast.success('Melhor Envio conectado com sucesso!', { id: 'melhor-envio-connection' });
-        } else {
-          const errMsg = result.data?.error || 'Falha ao concluir autenticação com Melhor Envio';
-          console.error("[MELHOR_ENVIO] Falha no intercâmbio de código:", errMsg);
-          toast.error(errMsg, { id: 'melhor-envio-connection' });
-        }
-      } catch (err: any) {
-        console.error("Erro no callback do Melhor Envio:", err);
-        toast.error(`Falha ao conectar com o Melhor Envio: ${err.message || err}`, { id: 'melhor-envio-connection' });
-      } finally {
-        window.history.replaceState({}, document.title, window.location.pathname);
-        console.log("[MELHOR_ENVIO] Redirecting to admin");
-        navigate('/admin/configuracoes');
-      }
+      console.log("[MELHOR_ENVIO] Modo Simulado Local Ativo. Código recebido:", code);
+      toast.success('Melhor Envio (Modo de Simulação Local Ativo)', { id: 'melhor-envio-connection' });
+      window.history.replaceState({}, document.title, window.location.pathname);
+      navigate('/admin/configuracoes');
     };
 
     handleCallback();
@@ -168,25 +181,41 @@ export default function Index() {
         </div>
       </section>
 
-      <section className="container mx-auto px-4 py-16">
-        <div className="bg-ocean rounded-[2.5rem] p-8 md:p-16 flex flex-col md:flex-row items-center justify-between gap-8 overflow-hidden relative">
-          <div className="relative z-10 max-w-lg space-y-6 text-white">
-            <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">OFERTA ESPECIAL</span>
-            <h2 className="text-4xl md:text-6xl font-black tracking-tight leading-none">Frete Grátis acima de R$ 299</h2>
-            <p className="text-lg text-white/80">Aproveite para renovar seu guarda-roupa sem se preocupar com a entrega.</p>
-            <Button size="lg" variant="secondary" className="font-bold h-14 px-8" onClick={() => navigate('/categoria/promocoes')}>Aproveitar Agora</Button>
+      {promoCTA && promoCTA.active && (
+        <section className="container mx-auto px-4 py-16">
+          <div 
+            className="rounded-[2.5rem] p-8 md:p-16 flex flex-col md:flex-row items-center justify-between gap-8 overflow-hidden relative"
+            style={{ backgroundColor: promoCTA.bgColor || '#2563EB', color: promoCTA.textColor || '#FFFFFF' }}
+          >
+            <div className="relative z-10 max-w-lg space-y-6">
+              <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-xs font-bold uppercase tracking-wider backdrop-blur-sm" style={{ color: promoCTA.textColor }}>OFERTA ESPECIAL</span>
+              <h2 className="text-4xl md:text-6xl font-black tracking-tight leading-none">
+                {resolvePlaceholders(promoCTA.title || '', promoCTA.value, promoCTA.installments)}
+              </h2>
+              <p className="text-lg opacity-90 whitespace-pre-line leading-relaxed">
+                {resolvePlaceholders(promoCTA.subtitle || '', promoCTA.value, promoCTA.installments)}
+              </p>
+              <Button 
+                size="lg" 
+                className="font-bold h-14 px-8 uppercase hover:opacity-90 transition-opacity" 
+                style={{ backgroundColor: promoCTA.textColor, color: promoCTA.bgColor }}
+                onClick={() => navigate(promoCTA.buttonLink || '/categoria/promocoes')}
+              >
+                {promoCTA.buttonText || 'Aproveitar Agora'}
+              </Button>
+            </div>
+            <div className="relative z-10 w-full md:w-1/2 aspect-square max-w-sm">
+               <img 
+                 src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop" 
+                 alt="Oferta Especial" 
+                 className="rounded-3xl shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500"
+               />
+            </div>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
           </div>
-          <div className="relative z-10 w-full md:w-1/2 aspect-square max-w-sm">
-             <img 
-               src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop" 
-               alt="Oferta Especial" 
-               className="rounded-3xl shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500"
-             />
-          </div>
-          <div className="absolute top-0 right-0 w-64 h-64 bg-ocean-glow/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-ocean-glow/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2"></div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }

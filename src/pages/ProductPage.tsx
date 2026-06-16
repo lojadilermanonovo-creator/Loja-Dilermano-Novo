@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import ProductCard from '@/src/components/ProductCard';
 import { Separator } from '@/components/ui/separator';
+import { calculateShippingMock } from '@/src/utils/shipping';
 
 const COLOR_MAP: Record<string, string> = {
   'Preto': '#000000',
@@ -313,7 +314,7 @@ export default function ProductPage() {
                  </div>
                  {shippingOptions.length > 0 && (
                    <div className="space-y-2 pt-2 border-t text-left">
-                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Opções reais Melhor Envio:</p>
+                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Opções de Frete:</p>
                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                        {shippingOptions.map((opt: any) => (
                          <div key={opt.id} className="flex justify-between items-center text-xs p-2 bg-slate-50 border rounded-xl">
@@ -377,9 +378,12 @@ export default function ProductPage() {
                         setCalculatingShipping(true);
                         setShippingOptions([]);
                         try {
-                          const calculateShipping = httpsCallable(functions, 'calculateShipping');
-                          const result: any = await calculateShipping({ zipCode: cleanZip });
-                          if (result.data && result.data.options && result.data.options.length > 0) {
+                          const calculateShipping = null; // Mocked
+                          const result: any = null;
+                          const options = calculateShippingMock(cleanZip);
+                          setShippingOptions(options);
+                          toast.success('Opções de frete carregadas!');
+                          if (false) {
                             setShippingOptions(result.data.options);
                             toast.success('Opções de frete carregadas!');
                           } else {
@@ -387,7 +391,7 @@ export default function ProductPage() {
                           }
                         } catch (e: any) {
                           console.error("[F12 DEBUG] Falha ao chamar a Cloud Function 'calculateShipping':", e);
-                          toast.error(e.message || 'Erro ao calcular frete com Melhor Envio');
+                          toast.error(e.message || 'Erro ao calcular frete local');
                         } finally {
                           setCalculatingShipping(false);
                         }

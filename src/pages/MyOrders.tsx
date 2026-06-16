@@ -29,8 +29,20 @@ export default function MyOrders() {
     fetchOrders();
   }, [user]);
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Pendente';
+      case 'paid': return 'Pagamento Aprovado';
+      case 'processing': return 'Separando Pedido';
+      case 'shipped': return 'Enviado';
+      case 'delivered': return 'Entregue';
+      case 'cancelled': return 'Cancelado';
+      default: return status || 'Pendente';
+    }
+  };
+
   return (
-    <div className="container mx-auto px-4 py-12">
+    <div className="container mx-auto px-4 py-12 max-w-4xl">
       <h1 className="text-3xl font-black uppercase tracking-tighter mb-8">Meus Pedidos</h1>
 
       {loading ? (
@@ -49,34 +61,42 @@ export default function MyOrders() {
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((order) => (
-            <div key={order.id} className="p-6 border rounded-2xl bg-card hover:bg-surface-elevated/20 transition-all flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground font-bold tracking-widest uppercase">Pedido {order.orderNumber}</p>
-                <p className="text-sm font-medium">{order.createdAt?.toDate().toLocaleDateString('pt-BR')}</p>
-                <div className="flex items-center gap-2 pt-2">
-                  <Badge variant="outline" className="rounded-full bg-ocean/5 text-ocean border-ocean/20">
-                    {order.items.length} {order.items.length === 1 ? 'item' : 'itens'}
-                  </Badge>
-                  <span className="text-lg font-black">
-                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total)}
-                  </span>
-                </div>
-              </div>
+          {orders.map((order) => {
+            const dateStr = order.createdAt 
+              ? (order.createdAt?.toDate ? order.createdAt.toDate() : new Date(order.createdAt?.seconds * 1000)).toLocaleDateString('pt-BR')
+              : 'Recente';
 
-              <div className="flex items-center gap-4">
-                 <div className="text-right hidden md:block">
-                   <p className="text-xs text-muted-foreground uppercase font-bold tracking-tighter">Status</p>
-                   <p className="font-bold flex items-center gap-1">
-                     <Clock className="h-3 w-3" /> {order.status}
-                   </p>
-                 </div>
-                 <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 border">
-                    <ChevronRight className="h-6 w-6" />
-                 </Button>
-              </div>
-            </div>
-          ))}
+            return (
+              <Link key={order.id} to={`/meus-pedidos/${order.id}`} className="block">
+                <div className="p-6 border rounded-2xl bg-card hover:bg-slate-50/40 hover:border-slate-350 transition-all flex flex-col md:flex-row md:items-center justify-between gap-6 cursor-pointer group">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground font-bold tracking-widest uppercase">Pedido {order.orderNumber}</p>
+                    <p className="text-sm font-medium text-slate-500">{dateStr}</p>
+                    <div className="flex items-center gap-2 pt-2">
+                      <Badge variant="outline" className="rounded-full bg-slate-50 text-slate-700 border-slate-200">
+                        {order.items?.length || 0} {order.items?.length === 1 ? 'item' : 'itens'}
+                      </Badge>
+                      <span className="text-lg font-black text-slate-900">
+                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                     <div className="text-right hidden md:block">
+                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-1">Status</p>
+                       <p className="font-extrabold text-xs text-blue-600 flex items-center gap-1.5 uppercase tracking-wide bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                         <Clock className="h-3 w-3" /> {getStatusLabel(order.status)}
+                       </p>
+                     </div>
+                     <Button variant="ghost" size="icon" className="rounded-full h-12 w-12 border group-hover:border-slate-300 group-hover:bg-white transition-colors">
+                        <ChevronRight className="h-6 w-6 text-slate-400 group-hover:text-slate-800 transition-colors" />
+                     </Button>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

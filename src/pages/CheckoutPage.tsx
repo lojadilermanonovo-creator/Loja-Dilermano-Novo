@@ -11,6 +11,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw, MapPin, Truck, AlertCircle } from 'lucide-react';
+import { calculateShippingMock } from '@/src/utils/shipping';
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart();
@@ -50,16 +51,12 @@ export default function CheckoutPage() {
     setSelectedShippingOption(null);
     setShippingOptions([]);
     try {
-      const calculateShipping = httpsCallable(functions, 'calculateShipping');
-      const result: any = await calculateShipping({ zipCode: zip });
-      if (result.data && result.data.options && result.data.options.length > 0) {
-        setShippingOptions(result.data.options);
-      } else {
-        toast.warning('Nenhuma opção de frete disponível para este CEP.');
-      }
+      // Offline Local shipping system (No Firebase Cloud Functions / No external endpoints)
+      const options = calculateShippingMock(zip);
+      setShippingOptions(options);
     } catch (err: any) {
-      console.error("[Checkout] Erro ao calcular frete real:", err);
-      toast.error(err.message || 'Erro ao cotar frete real com Melhor Envio');
+      console.error("[Checkout] Erro ao calcular frete local:", err);
+      toast.error(err.message || 'Erro ao calcular frete local');
     } finally {
       setCalculatingShipping(false);
     }
@@ -74,7 +71,7 @@ export default function CheckoutPage() {
     }
 
     if (!selectedShippingOption) {
-      toast.error('Selecione uma opção de frete real do Melhor Envio para prosseguir.');
+      toast.error('Selecione uma opção de frete para prosseguir.');
       return;
     }
 
@@ -175,7 +172,7 @@ export default function CheckoutPage() {
               {calculatingShipping && (
                 <div className="text-xs text-blue-600 font-semibold animate-pulse py-4 flex items-center gap-2 justify-center bg-blue-50/50 rounded-xl border border-blue-105">
                   <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
-                  <span>Obtendo cotações de entrega integrada Melhor Envio...</span>
+                  <span>Calculando opções de frete...</span>
                 </div>
               )}
 
@@ -220,7 +217,7 @@ export default function CheckoutPage() {
               {address.zipCode.replace(/\D/g, '').length === 8 && shippingOptions.length === 0 && !calculatingShipping && (
                 <div className="text-xs text-amber-600 font-semibold py-3 flex items-center gap-2 justify-center bg-amber-50 rounded-xl border border-amber-200">
                   <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                  <span>Nenhum frete real retornado. Certifique-se de que a API está conectada.</span>
+                  <span>Erro ao obter opções para este CEP. Insira um CEP válido.</span>
                 </div>
               )}
             </div>

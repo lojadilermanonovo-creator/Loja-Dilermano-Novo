@@ -24,6 +24,11 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
+  // States for Order Tracking management
+  const [carrierNameInput, setCarrierNameInput] = useState('');
+  const [trackingCodeInput, setTrackingCodeInput] = useState('');
+  const [savingTracking, setSavingTracking] = useState(false);
+
   const fetchOrders = async () => {
     setLoading(true);
     try {
@@ -126,7 +131,53 @@ export default function AdminOrders() {
       if (newStatus === 'cancelled') {
         await restoreStock(orderId);
       }
-      await updateDoc(doc(db, 'orders', orderId), { status: newStatus });
+
+      const existingOrder = orders.find(o => o.id === orderId);
+      let trackingEvents = existingOrder?.trackingEvents || [];
+      if (!Array.isArray(trackingEvents)) {
+        trackingEvents = [];
+      }
+
+      const getStatusLabel = (status: string) => {
+        switch (status) {
+          case 'pending': return 'Pedido recebido';
+          case 'paid': return 'Pagamento aprovado';
+          case 'processing': return 'Separando pedido';
+          case 'shipped': return 'Pedido enviado';
+          case 'delivered': return 'Pedido entregue';
+          case 'cancelled': return 'Pedido cancelado';
+          default: return 'Status atualizado';
+        }
+      };
+
+      const getStatusDesc = (status: string) => {
+        switch (status) {
+          case 'pending': return 'Seu pedido foi registrado e aguarda confirmação de pagamento.';
+          case 'paid': return 'Seu pagamento foi recebido e confirmado.';
+          case 'processing': return 'Nossa equipe está coletando e preparando seus itens.';
+          case 'shipped': return 'O pacote foi postado e já está a caminho de sua residência.';
+          case 'delivered': return 'O produto foi entregue no endereço solicitado.';
+          case 'cancelled': return 'O pedido foi cancelado e os itens retornaram ao estoque.';
+          default: return 'O status do seu pedido foi atualizado para: ' + status;
+        }
+      };
+
+      const alreadyLogged = trackingEvents.some((ev: any) => ev.code === newStatus);
+      const updatedEvents = [...trackingEvents];
+      if (!alreadyLogged) {
+        updatedEvents.push({
+          code: newStatus,
+          label: getStatusLabel(newStatus),
+          description: getStatusDesc(newStatus),
+          createdAt: new Date(),
+        });
+      }
+
+      await updateDoc(doc(db, 'orders', orderId), { 
+        status: newStatus,
+        trackingEvents: updatedEvents,
+      });
+
       toast.success('Status do pedido atualizado com sucesso');
       fetchOrders();
       // Keep selected order detail in sync if drawer is open
@@ -134,7 +185,8 @@ export default function AdminOrders() {
         setSelectedOrder((prev: any) => ({ 
           ...prev, 
           status: newStatus,
-          stockDeducted: newStatus === 'cancelled' ? false : prev.stockDeducted
+          stockDeducted: newStatus === 'cancelled' ? false : prev.stockDeducted,
+          trackingEvents: updatedEvents,
         }));
       }
     } catch (error: any) {
@@ -147,12 +199,18 @@ export default function AdminOrders() {
       try {
         await restoreStock(orderId);
         await updateDoc(doc(db, 'orders', orderId), { 
-          paymentStatus: 'pending'
+          paymentStatus: 'pending',
+          status: 'pending'
         });
         toast.success('Status do pagamento definido como Pendente e estoque devolvido!');
         fetchOrders();
         if (selectedOrder && selectedOrder.id === orderId) {
-          setSelectedOrder((prev: any) => ({ ...prev, paymentStatus: 'pending', stockDeducted: false }));
+          setSelectedOrder((prev: any) => ({ 
+            ...prev, 
+            paymentStatus: 'pending', 
+            status: 'pending',
+            stockDeducted: false 
+          }));
         }
       } catch (error: any) {
         toast.error('Erro ao atualizar status do pagamento: ' + (error?.message || ''));
@@ -173,7 +231,23 @@ export default function AdminOrders() {
         
         // Return early if stock is already deducted for this order
         if (orderData.stockDeducted === true) {
-          transaction.update(orderRef, { paymentStatus: 'paid' });
+          let trackingEvents = orderData.trackingEvents || [];
+          if (!Array.isArray(trackingEvents)) {
+            trackingEvents = [];
+          }
+          if (!trackingEvents.some((ev: any) => ev.code === 'paid')) {
+            trackingEvents.push({
+              code: 'paid',
+              label: 'Pagamento aprovado',
+              description: 'Seu pagamento foi confirmado com sucesso.',
+              createdAt: new Date(),
+            });
+          }
+          transaction.update(orderRef, { 
+            paymentStatus: 'paid',
+            status: 'paid',
+            trackingEvents: trackingEvents
+          });
           return;
         }
         
@@ -239,9 +313,25 @@ export default function AdminOrders() {
           }
         }
         
+        // Log paid tracking event in transaction
+        let trackingEvents = orderData.trackingEvents || [];
+        if (!Array.isArray(trackingEvents)) {
+          trackingEvents = [];
+        }
+        if (!trackingEvents.some((ev: any) => ev.code === 'paid')) {
+          trackingEvents.push({
+            code: 'paid',
+            label: 'Pagamento aprovado',
+            description: 'Seu pagamento foi confirmado com sucesso.',
+            createdAt: new Date(),
+          });
+        }
+
         // Successfully updated stocks! Mark payment status of the order as Paid and deduct state as True
         transaction.update(orderRef, {
           paymentStatus: 'paid',
+          status: 'paid',
+          trackingEvents: trackingEvents,
           stockDeducted: true,
           auditError: null
         });
@@ -250,7 +340,31 @@ export default function AdminOrders() {
       toast.success('Baixa de estoque efetuada e pagamento registrado!');
       fetchOrders();
       if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev: any) => ({ ...prev, paymentStatus: 'paid', stockDeducted: true, auditError: null }));
+        setSelectedOrder((prev: any) => {
+          let trackingEvents = prev.trackingEvents || [];
+          if (!Array.isArray(trackingEvents)) {
+            trackingEvents = [];
+          }
+          if (!trackingEvents.some((ev: any) => ev.code === 'paid')) {
+            trackingEvents = [
+              ...trackingEvents,
+              {
+                code: 'paid',
+                label: 'Pagamento aprovado',
+                description: 'Seu pagamento foi confirmado com sucesso.',
+                createdAt: new Date(),
+              }
+            ];
+          }
+          return { 
+            ...prev, 
+            paymentStatus: 'paid', 
+            status: 'paid',
+            trackingEvents: trackingEvents,
+            stockDeducted: true, 
+            auditError: null 
+          };
+        });
       }
     } catch (error: any) {
       console.error("Transação de pagamento falhou:", error);
@@ -276,6 +390,8 @@ export default function AdminOrders() {
     switch (status) {
       case 'pending': 
         return <Badge variant="secondary" className="gap-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200"><Clock className="h-3 w-3" /> Pendente</Badge>;
+      case 'paid':
+        return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 gap-1 rounded-full"><DollarSign className="h-3 w-3" /> Pago</Badge>;
       case 'processing': 
         return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-50 gap-1 rounded-full"><CheckCircle2 className="h-3 w-3" /> Processando</Badge>;
       case 'shipped': 
@@ -292,7 +408,57 @@ export default function AdminOrders() {
   // Open inspection drawer
   const handleInspectOrder = (order: any) => {
     setSelectedOrder(order);
+    setCarrierNameInput(order.carrierName || '');
+    setTrackingCodeInput(order.trackingCode || '');
     setIsDetailOpen(true);
+  };
+
+  const handleSaveTracking = async () => {
+    if (!selectedOrder) return;
+    setSavingTracking(true);
+    try {
+      const orderRef = doc(db, 'orders', selectedOrder.id);
+      
+      const hadTracking = !!selectedOrder.trackingCode;
+      const isAddingTracking = !!trackingCodeInput && !hadTracking;
+
+      let updatedEvents = selectedOrder.trackingEvents || [];
+      if (!Array.isArray(updatedEvents)) {
+        updatedEvents = [];
+      }
+
+      // If tracking code is added for the first time, log the special tracking_added event
+      if (isAddingTracking) {
+        updatedEvents.push({
+          code: "tracking_added",
+          label: "Código de rastreamento disponível",
+          description: `Seu pedido já pode ser acompanhado. Transportadora: ${carrierNameInput || 'Transportadora registrada'}, Código: ${trackingCodeInput}`,
+          createdAt: new Date(),
+        });
+      }
+
+      await updateDoc(orderRef, {
+        carrierName: carrierNameInput.trim(),
+        trackingCode: trackingCodeInput.trim(),
+        trackingEvents: updatedEvents,
+      });
+
+      toast.success('Rastreamento atualizado com sucesso!');
+      
+      setSelectedOrder((prev: any) => ({
+        ...prev,
+        carrierName: carrierNameInput.trim(),
+        trackingCode: trackingCodeInput.trim(),
+        trackingEvents: updatedEvents,
+      }));
+
+      fetchOrders();
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Erro ao salvar rastreamento: ' + (e.message || 'Erro indeterminado'));
+    } finally {
+      setSavingTracking(false);
+    }
   };
 
   const filteredOrders = orders.filter(order => {
@@ -340,6 +506,7 @@ export default function AdminOrders() {
             <SelectContent>
               <SelectItem value="all">Ver Todos</SelectItem>
               <SelectItem value="pending">Pendente</SelectItem>
+              <SelectItem value="paid">Pago</SelectItem>
               <SelectItem value="processing">Processando</SelectItem>
               <SelectItem value="shipped">Enviado</SelectItem>
               <SelectItem value="delivered">Entregue</SelectItem>
@@ -456,6 +623,7 @@ export default function AdminOrders() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="pending">Pendente</SelectItem>
+                            <SelectItem value="paid">Pago</SelectItem>
                             <SelectItem value="processing">Processando</SelectItem>
                             <SelectItem value="shipped">Enviado</SelectItem>
                             <SelectItem value="delivered">Entregue</SelectItem>
@@ -520,6 +688,7 @@ export default function AdminOrders() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="pending">Pendente</SelectItem>
+                          <SelectItem value="paid">Pago</SelectItem>
                           <SelectItem value="processing">Processando</SelectItem>
                           <SelectItem value="shipped">Enviado</SelectItem>
                           <SelectItem value="delivered">Entregue</SelectItem>
@@ -624,6 +793,49 @@ export default function AdminOrders() {
                 )}
               </Card>
             </div>
+
+            {/* Tracking and Carrier Management Module */}
+            <Card className="rounded-2xl border border-slate-200 shadow-none bg-slate-50/40 p-5 space-y-4">
+              <div className="flex items-center gap-2 font-bold text-slate-800 border-b border-slate-100 pb-3">
+                <Truck className="h-4.5 w-4.5 text-blue-500" />
+                <span>Gestão de Rastreamento da Entrega</span>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-600" htmlFor="carrierNameInput">Transportadora</label>
+                  <Input 
+                    id="carrierNameInput"
+                    placeholder="Ex: Correios, Jadlog, Loggi..."
+                    value={carrierNameInput}
+                    onChange={(e) => setCarrierNameInput(e.target.value)}
+                    className="h-10 bg-white border-slate-200 rounded-xl"
+                  />
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-600" htmlFor="trackingCodeInput">Código de Rastreamento</label>
+                  <Input 
+                    id="trackingCodeInput"
+                    placeholder="Ex: AB123456789BR"
+                    value={trackingCodeInput}
+                    onChange={(e) => setTrackingCodeInput(e.target.value)}
+                    className="h-10 bg-white border-slate-200 rounded-xl font-mono uppercase"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end pt-2">
+                <Button 
+                  onClick={handleSaveTracking}
+                  disabled={savingTracking}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-10 px-5 text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all"
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  {savingTracking ? 'Salvando...' : 'Salvar Rastreamento'}
+                </Button>
+              </div>
+            </Card>
 
             {/* Shopping Cart Products Items lists */}
             <div className="space-y-3">
