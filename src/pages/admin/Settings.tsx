@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db, functions } from '@/src/integrations/firebase/client';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,10 +10,15 @@ import { toast } from 'sonner';
 import { 
   Settings, Save, Phone, QrCode, MapPin, Store, 
   Globe, Key, RefreshCw, AlertCircle, CheckCircle2, Truck,
-  Megaphone, Palette
+  Megaphone, Palette, Trash2, AlertTriangle, Download
 } from 'lucide-react';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { 
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription 
+} from '@/components/ui/dialog';
 
 export default function AdminSettings() {
+  const { isAdmin: authIsAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -43,6 +48,12 @@ export default function AdminSettings() {
   const [meMode, setMeMode] = useState<'sandbox' | 'production'>('sandbox');
   const [meConnected, setMeConnected] = useState(false);
   const [meExpiresAt, setMeExpiresAt] = useState<number | null>(null);
+
+  // States for clean test orders dialog
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadSettings = async () => {
     setLoading(true);
@@ -246,6 +257,99 @@ export default function AdminSettings() {
     }
   };
 
+  const handleExportOrders = async () => {
+    setExporting(true);
+    try {
+      const snap = await getDocs(collection(db, 'orders'));
+      if (snap.empty) {
+        toast.info('Não há pedidos a serem exportados.');
+        return;
+      }
+      
+      const ordersList = snap.docs.map(doc => {
+        const data = doc.data();
+        const sanitizedData: any = { ...data, id: doc.id };
+        for (const key in sanitizedData) {
+          if (sanitizedData[key] && typeof sanitizedData[key].toDate === 'function') {
+            sanitizedData[key] = sanitizedData[key].toDate().toISOString();
+          }
+        }
+        if (Array.isArray(sanitizedData.trackingEvents)) {
+          sanitizedData.trackingEvents = sanitizedData.trackingEvents.map((ev: any) => {
+            const sanitizedEv = { ...ev };
+            for (const k in sanitizedEv) {
+              if (sanitizedEv[k] && typeof sanitizedEv[k].toDate === 'function') {
+                sanitizedEv[k] = sanitizedEv[k].toDate().toISOString();
+              }
+            }
+            return sanitizedEv;
+          });
+        }
+        return sanitizedData;
+      });
+
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(ordersList, null, 2)
+      )}`;
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', jsonString);
+      downloadAnchor.setAttribute('download', `pedidos_backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      
+      toast.success('Pedidos exportados em formato JSON para download local!');
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Erro ao exportar pedidos: ' + (e?.message || ''));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDeleteOrders = async () => {
+    if (confirmText !== 'APAGAR PEDIDOS') {
+      toast.error('Por favor, digite o texto de confirmação exatamente como solicitado.');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const ordersRef = collection(db, 'orders');
+      const snap = await getDocs(ordersRef);
+
+      if (snap.empty) {
+        toast.info('Nenhum pedido de teste encontrado na coleção "orders".');
+        setIsConfirmModalOpen(false);
+        setConfirmText('');
+        return;
+      }
+
+      const docs = snap.docs;
+      const chunks = [];
+      const chunkSize = 500;
+      for (let i = 0; i < docs.length; i += chunkSize) {
+        chunks.push(docs.slice(i, i + chunkSize));
+      }
+
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        chunk.forEach((document) => {
+          batch.delete(doc(db, 'orders', document.id));
+        });
+        await batch.commit();
+      }
+      toast.success('Todos os pedidos de teste foram apagados com sucesso!');
+      setConfirmText('');
+      setIsConfirmModalOpen(false);
+    } catch (e: any) {
+      console.error(e);
+      toast.error('Erro ao apagar pedidos de teste: ' + (e?.message || ''));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const resolvePlaceholders = (text: string, value: number | '', installments: number | '') => {
     if (!text) return '';
     let result = text;
@@ -418,6 +522,47 @@ export default function AdminSettings() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Tool for Cleaning Test Orders */}
+              {authIsAdmin && (
+                <Card className="rounded-2xl border-2 border-rose-100 bg-rose-50/20 shadow-none p-6 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-rose-100 text-rose-600 p-2.5 rounded-xl">
+                      <Trash2 className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">
+                        Limpeza de Pedidos de Teste
+                      </h3>
+                      <p className="text-xs text-slate-550">
+                        Ferramenta temporária para remover pedidos criados durante os testes da loja.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100">
+                    <Button 
+                      type="button"
+                      onClick={handleExportOrders}
+                      disabled={exporting}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-10 px-5 text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all"
+                    >
+                      <Download className="h-4 w-4" />
+                      {exporting ? 'Exportando...' : 'Exportar Pedidos (JSON)'}
+                    </Button>
+
+                    <Button 
+                      type="button"
+                      variant="destructive"
+                      onClick={() => setIsConfirmModalOpen(true)}
+                      className="bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl h-10 px-5 text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Apagar Todos os Pedidos
+                    </Button>
+                  </div>
+                </Card>
+              )}
 
               {/* Form Confirm Bar */}
               <div className="flex justify-end pt-4">
@@ -791,6 +936,69 @@ export default function AdminSettings() {
           )}
         </div>
       )}
+
+      {/* Confirmation Dialog for Test Orders Clean-up */}
+      <Dialog open={isConfirmModalOpen} onOpenChange={setIsConfirmModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-150">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-2">
+              <AlertTriangle className="h-5 w-5 text-rose-500 animate-pulse" />
+              <span>⚠️ Atenção</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-rose-700 font-semibold bg-rose-50 p-4 rounded-xl border border-rose-100 leading-relaxed">
+              Esta ação removerá permanentemente todos os pedidos cadastrados na coleção orders. Esta operação não poderá ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-4 text-xs font-medium">
+            <p className="text-slate-600">
+              Para prosseguir e confirmar esta exclusão, digite exatamente as palavras abaixo no campo de segurança:
+            </p>
+            <div className="bg-slate-50 border border-slate-150 py-2 rounded-xl text-center select-none">
+              <span className="font-mono font-black text-rose-600 text-sm tracking-wider uppercase">
+                APAGAR PEDIDOS
+              </span>
+            </div>
+            
+            <div className="space-y-1.5 focus-within:text-blue-500 text-slate-500">
+              <Label htmlFor="sec-input" className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Código de Confirmação</Label>
+              <Input 
+                id="sec-input"
+                autoComplete="off"
+                placeholder="Digite APAGAR PEDIDOS"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                className="h-11 bg-white border-slate-200 rounded-xl font-mono text-center uppercase tracking-wide placeholder:font-sans placeholder:normal-case font-bold focus:border-blue-500 focus:ring-1 focus:ring-blue-100"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 sm:flex-row flex-col border-t border-slate-100 pt-3">
+            <Button 
+              type="button"
+              variant="outline" 
+              onClick={() => {
+                setIsConfirmModalOpen(false);
+                setConfirmText('');
+              }} 
+              disabled={isDeleting}
+              className="rounded-xl h-11 border-slate-200 hover:bg-slate-50 flex-1 text-slate-600 font-bold text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteOrders}
+              disabled={confirmText !== 'APAGAR PEDIDOS' || isDeleting}
+              className="rounded-xl h-11 bg-rose-600 hover:bg-rose-700 text-white font-bold flex-1 text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md disabled:cursor-not-allowed"
+            >
+              <Trash2 className="h-4 w-4" />
+              {isDeleting ? 'Apagando...' : 'Confirmar Exclusão'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
