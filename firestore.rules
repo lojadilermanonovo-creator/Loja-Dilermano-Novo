@@ -45,8 +45,13 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
       allow update: if isSignedIn() 
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount'])
-                    && (request.resource.data.usedCount == (resource.data.get('usedCount', 0) + 1));
+                    && request.resource.data.get('usedCount', 0) == resource.data.get('usedCount', 0) + 1
+                    && request.resource.data.get('code', '') == resource.data.get('code', '')
+                    && request.resource.data.get('isActive', true) == resource.data.get('isActive', true)
+                    && request.resource.data.get('value', 0) == resource.data.get('value', 0)
+                    && request.resource.data.get('type', '') == resource.data.get('type', '')
+                    && request.resource.data.get('minOrderValue', 0) == resource.data.get('minOrderValue', 0)
+                    && request.resource.data.get('maxUses', 0) == resource.data.get('maxUses', 0);
     }
 
     match /users/{uid} {
