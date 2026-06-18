@@ -44,6 +44,9 @@ service cloud.firestore {
     match /coupons/{id} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+      allow update: if isSignedIn() 
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount'])
+                    && (request.resource.data.usedCount == (resource.data.get('usedCount', 0) + 1));
     }
 
     match /users/{uid} {
@@ -75,7 +78,7 @@ service cloud.firestore {
     }
 
     match /settings/{id} {
-      allow read: if id == 'general' || isAdmin();
+      allow read: if id == 'general' || id == 'promocta' || isAdmin();
       allow write: if isAdmin();
     }
   }
