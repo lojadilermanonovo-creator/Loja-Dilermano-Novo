@@ -10,6 +10,7 @@ export interface ShippingOption {
   delivery_time: number;
   days: number; // Backward compatibility with the existing UI (.days)
   company?: string;
+  description?: string;
 }
 
 /**
@@ -67,6 +68,15 @@ export function calculateShippingMock(cep: string): ShippingOption[] {
       delivery_time: 3,
       days: 3,
       company: "Frete Expresso"
+    },
+    {
+      id: "negotiated",
+      name: "Frete Negociado com o Vendedor",
+      price: 0,
+      delivery_time: 0,
+      days: 0,
+      company: "Frete Negociado",
+      description: "Combine o valor do frete diretamente com nossa equipe."
     }
   ];
 }

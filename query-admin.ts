@@ -20,14 +20,23 @@ async function run() {
     console.log("settings/promocta does not exist!");
   }
 
-  console.log("\n--- AUDITING COUPONS ---");
-  const couponsSnap = await db.collection('coupons').get();
-  if (couponsSnap.empty) {
-    console.log("Coupons collection is empty.");
+  console.log("\n--- AUDITING CATEGORIES ---");
+  const categoriesSnap = await db.collection('categories').get();
+  if (categoriesSnap.empty) {
+    console.log("Categories collection is empty.");
   } else {
-    couponsSnap.forEach(doc => {
-      console.log(`Coupon Code: ${doc.id}`);
-      console.log(`Coupon Data:`, JSON.stringify(doc.data(), null, 2));
+    categoriesSnap.forEach(doc => {
+      console.log(`Category ID: ${doc.id}, Name: ${doc.data().name}, Data:`, JSON.stringify(doc.data(), null, 2));
+    });
+  }
+
+  console.log("\n--- AUDITING PRODUCTS ---");
+  const productsSnap = await db.collection('products').limit(5).get();
+  if (productsSnap.empty) {
+    console.log("Products collection is empty.");
+  } else {
+    productsSnap.forEach(doc => {
+      console.log(`Product ID: ${doc.id}, Name: ${doc.data().name}, CategoryID: ${doc.data().categoryId}, Data:`, JSON.stringify(doc.data(), null, 2));
     });
   }
 }

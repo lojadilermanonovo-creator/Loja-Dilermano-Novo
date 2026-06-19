@@ -47,13 +47,33 @@ export default function CategoryPage() {
           );
         } else {
           // Real Category
-          const categoryDoc = await getDoc(doc(db, 'categories', id));
+          let targetId = id;
+          let categoryDoc = await getDoc(doc(db, 'categories', id));
           if (categoryDoc.exists()) {
             categoryData = { id: categoryDoc.id, ...(categoryDoc.data() as object) };
+          } else {
+            // Check if it's masculine or feminine route and try to locate by matching name (e.g. "Masculina" or "Feminina")
+            const normalizedId = id.toLowerCase();
+            const nameVariants = normalizedId === 'masculino' 
+              ? ['Masculino', 'Masculina'] 
+              : normalizedId === 'feminino' 
+                ? ['Feminino', 'Feminina'] 
+                : [];
+            
+            if (nameVariants.length > 0) {
+              const qCat = query(collection(db, 'categories'), where('name', 'in', nameVariants));
+              const catSnap = await getDocs(qCat);
+              if (!catSnap.empty) {
+                const foundDoc = catSnap.docs[0];
+                categoryDoc = foundDoc;
+                categoryData = { id: foundDoc.id, ...(foundDoc.data() as object) };
+                targetId = foundDoc.id;
+              }
+            }
           }
           productsQuery = query(
             collection(db, 'products'),
-            where('categoryId', '==', id),
+            where('categoryId', '==', targetId),
             where('isActive', '==', true)
           );
         }

@@ -753,6 +753,28 @@ export default function AdminOrders() {
               </Card>
             </div>
 
+            {/* Negotiation Details card */}
+            {selectedOrder?.shippingType === 'negotiated' && (
+              <Card className="rounded-2xl border border-amber-200 shadow-none bg-amber-50/20 p-4 space-y-3">
+                <div className="flex items-center gap-2 font-bold text-amber-800 border-b border-amber-100 pb-2.5">
+                  <span className="text-base">🤝</span>
+                  <span>Detalhes do Frete Negociado</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-500 block uppercase tracking-wider text-[10px]">Tipo de Frete</span>
+                    <span className="font-extrabold text-slate-800 text-sm">Frete Negociado com o Vendedor</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-500 block uppercase tracking-wider text-[10px]">Status do Frete</span>
+                    <Badge className="bg-amber-100 hover:bg-amber-100 text-amber-800 border border-amber-200 mt-1 rounded-full font-bold shadow-none">
+                      Aguardando Negociação
+                    </Badge>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {/* Tracking and Carrier Management Module */}
             <Card className="rounded-2xl border border-slate-200 shadow-none bg-slate-50/40 p-5 space-y-4">
               <div className="flex items-center gap-2 font-bold text-slate-800 border-b border-slate-100 pb-3">

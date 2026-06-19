@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { db, functions } from '@/src/integrations/firebase/client';
-import { collection, addDoc, serverTimestamp, runTransaction, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, runTransaction, doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, MapPin, Truck, AlertCircle, Tag } from 'lucide-react';
+import { RefreshCw, MapPin, Truck, AlertCircle, Tag, MessageCircle } from 'lucide-react';
 import { calculateShippingMock } from '@/src/utils/shipping';
 
 export default function CheckoutPage() {
@@ -34,6 +34,24 @@ export default function CheckoutPage() {
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [selectedShippingOption, setSelectedShippingOption] = useState<any | null>(null);
   const [calculatingShipping, setCalculatingShipping] = useState(false);
+  const [storeWhatsapp, setStoreWhatsapp] = useState<string>('');
+
+  useEffect(() => {
+    const fetchStoreWhatsapp = async () => {
+      try {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'general'));
+        if (settingsSnap.exists()) {
+          const data = settingsSnap.data();
+          if (data.whatsapp) {
+            setStoreWhatsapp(data.whatsapp);
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao buscar WhatsApp em settings/general:", err);
+      }
+    };
+    fetchStoreWhatsapp();
+  }, []);
 
   // Monitor Zip Code pattern (8 digits) to calculate shipping
   useEffect(() => {
@@ -80,7 +98,7 @@ export default function CheckoutPage() {
       const shippingCost = selectedShippingOption ? selectedShippingOption.price : 0;
       const totalAmount = Math.max(subtotal - discountAmount, 0) + shippingCost;
 
-      const orderData = {
+      const orderData: any = {
         userId: user.uid,
         items,
         subtotal,
@@ -91,6 +109,10 @@ export default function CheckoutPage() {
           days: selectedShippingOption.days,
           company: selectedShippingOption.company || selectedShippingOption.name
         } : null,
+        ...(selectedShippingOption?.id === 'negotiated' ? {
+          shippingType: "negotiated",
+          shippingStatus: "awaiting_negotiation"
+        } : {}),
         couponCode: appliedCoupon ? appliedCoupon.code : null,
         couponType: appliedCoupon ? appliedCoupon.type : null,
         couponValue: appliedCoupon ? appliedCoupon.value : null,
@@ -248,7 +270,9 @@ export default function CheckoutPage() {
                             />
                             <div className="text-left">
                               <span className="font-bold text-xs block text-slate-800">{opt.name}</span>
-                              <span className="text-[10px] text-slate-400">{opt.days} dias úteis</span>
+                              <span className="text-[10px] text-slate-400">
+                                {opt.id === 'negotiated' ? (opt.description || 'Combine o valor diretamente com nossa equipe.') : `${opt.days} dias úteis`}
+                              </span>
                             </div>
                           </div>
                           <span className="text-xs font-extrabold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
@@ -258,6 +282,26 @@ export default function CheckoutPage() {
                       );
                     })}
                   </div>
+
+                  {/* Negotiation block */}
+                  {selectedShippingOption?.id === 'negotiated' && (
+                    <div className="mt-4 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3 animate-in fade-in-50 duration-200">
+                      <h4 className="text-sm font-extrabold text-emerald-800 flex items-center gap-1.5 uppercase tracking-wider">
+                        <MessageCircle className="h-4 w-4 text-emerald-600 shrink-0" /> Negociar Frete
+                      </h4>
+                      <p className="text-xs text-emerald-700 font-semibold leading-relaxed">
+                        Entre em contato pelo WhatsApp para combinar o valor do frete.
+                      </p>
+                      <a
+                        href={`https://wa.me/${(storeWhatsapp || "5591983997964").replace(/\D/g, '')}?text=${encodeURIComponent("Olá! Gostaria de negociar o frete do meu pedido.")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 rounded-xl flex items-center justify-center gap-2 transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99] text-xs uppercase"
+                      >
+                        <MessageCircle className="h-4 w-4 shrink-0" /> Falar no WhatsApp
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 

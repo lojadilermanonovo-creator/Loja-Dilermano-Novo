@@ -21,6 +21,7 @@ import Register from '@/src/pages/Register';
 import ForgotPassword from '@/src/pages/ForgotPassword';
 import ResetPassword from '@/src/pages/ResetPassword';
 import NotFound from '@/src/pages/NotFound';
+import InstitutionalPage from '@/src/pages/Institutional';
 
 // Admin Pages
 import AdminDashboard from '@/src/pages/admin/Dashboard';
@@ -41,6 +42,7 @@ import Header from '@/src/components/Header';
 import Footer from '@/src/components/Footer';
 import WhatsAppButton from '@/src/components/WhatsAppButton';
 import ProtectedRoute from '@/src/components/ProtectedRoute';
+import ScrollToTop from '@/src/components/ScrollToTop';
 
 const queryClient = new QueryClient();
 
@@ -64,6 +66,7 @@ export default function App() {
         <DatabaseStatusProvider>
           <CartProvider>
             <Router>
+              <ScrollToTop />
               <Routes>
                 {/* Store Routes */}
                 <Route element={<StoreLayout />}>
@@ -78,6 +81,12 @@ export default function App() {
                   <Route path="/register" element={<Register />} />
                   <Route path="/forgot-password" element={<ForgotPassword />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  
+                  {/* Institutional routes */}
+                  <Route path="/faq" element={<InstitutionalPage type="faq" />} />
+                  <Route path="/politica-de-privacidade" element={<InstitutionalPage type="privacy" />} />
+                  <Route path="/termos-de-uso" element={<InstitutionalPage type="terms" />} />
+                  <Route path="/trocas-e-devolucoes" element={<InstitutionalPage type="refunds" />} />
                   
                   <Route element={<ProtectedRoute />}>
                     <Route path="/conta" element={<MyAccount />} />
