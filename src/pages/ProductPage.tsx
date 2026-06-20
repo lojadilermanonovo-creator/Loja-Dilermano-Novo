@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import ProductCard from '@/src/components/ProductCard';
 import { Separator } from '@/components/ui/separator';
 import { calculateShippingMock } from '@/src/utils/shipping';
+import { useFreeShippingThreshold } from '@/src/hooks/useFreeShippingThreshold';
 
 const COLOR_MAP: Record<string, string> = {
   'Preto': '#000000',
@@ -27,6 +28,7 @@ const COLOR_MAP: Record<string, string> = {
 
 export default function ProductPage() {
   const { id } = useParams();
+  const freeShippingThreshold = useFreeShippingThreshold();
   const [product, setProduct] = useState<any>(null);
   const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -340,7 +342,7 @@ export default function ProductPage() {
                <Truck className="h-5 w-5 text-ocean" />
                <div>
                   <p className="text-sm font-bold">Frete Grátis</p>
-                  <p className="text-xs text-muted-foreground">Em compras acima de R$ 299,00</p>
+                  <p className="text-xs text-muted-foreground">Em compras acima de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(freeShippingThreshold)}</p>
                </div>
              </div>
              <div className="flex items-center gap-3 p-4 rounded-2xl bg-surface-elevated/50">

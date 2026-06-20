@@ -13,6 +13,7 @@ export default function CheckoutSuccess() {
   const orderId = searchParams.get('orderId');
   const [order, setOrder] = useState<any>(null);
   const [pixKey, setPixKey] = useState('');
+  const [pixQrCodeUrl, setPixQrCodeUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [loading, setLoading] = useState(true);
@@ -41,8 +42,10 @@ export default function CheckoutSuccess() {
           const data = settingsSnap.data();
           console.log("[F12 DEBUG] Conteúdo completo de 'settings/general':", JSON.stringify(data, null, 2));
           const key = data.pixKey || '';
+          const customUrl = data.pixQrCodeUrl || '';
           console.log("[F12 DEBUG] Chave PIX identificada no documento:", key);
           setPixKey(key);
+          setPixQrCodeUrl(customUrl);
           if (key) {
             try {
               const url = await QRCode.toDataURL(key, { margin: 1, width: 256 });
@@ -112,14 +115,24 @@ export default function CheckoutSuccess() {
           Para concluir sua compra, faça a transferência do valor total do pedido utilizando o QR Code ou copiando a chave PIX informada abaixo. Após o pagamento, o sistema processará seu pedido para envio.
         </p>
 
-        {qrDataUrl ? (
+        {pixQrCodeUrl ? (
+          <div className="flex flex-col items-center gap-2 py-4 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-sm mx-auto w-full">
+            <img 
+              src={pixQrCodeUrl} 
+              className="w-48 h-48 rounded-xl object-contain" 
+              alt="Custom PIX QR Code" 
+              referrerPolicy="no-referrer"
+            />
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Aponte a câmera do banco no QR Code</span>
+          </div>
+        ) : qrDataUrl ? (
           <div className="flex flex-col items-center gap-2 py-4 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-sm mx-auto w-full">
             <img 
               src={qrDataUrl} 
               className="w-48 h-48 rounded-xl object-contain" 
               alt="PIX QR Code" 
             />
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Aponte a câmera do banco no QR Code</span>
+            <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Aponte a câmera do banco no QR Code</span>
           </div>
         ) : pixKey ? (
           <div className="p-6 rounded-2xl bg-white border border-slate-100 shadow-sm max-w-sm mx-auto w-full text-center text-xs font-semibold text-slate-500">

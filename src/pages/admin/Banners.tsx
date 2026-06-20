@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Plus, Pencil, Trash2, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import ImageUploader from '@/src/components/admin/ImageUploader';
 
 export default function AdminBanners() {
   const [banners, setBanners] = useState<any[]>([]);
@@ -270,13 +271,12 @@ export default function AdminBanners() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="b-imageUrl" className="text-slate-700 font-semibold text-xs">URL da Imagem Banner (1920x800)</Label>
-              <Input 
-                id="b-imageUrl" 
-                value={imageUrl} 
-                onChange={(e) => setImageUrl(e.target.value)} 
-                placeholder="https://images.unsplash.com/..." 
-                className="rounded-xl border-slate-200 text-sm font-mono"
+              <ImageUploader
+                value={imageUrl}
+                onChange={setImageUrl}
+                folder="banners"
+                label="Imagem do Banner (Recomendado: 1920x800)"
+                placeholder="Cole a URL ou suba um arquivo"
               />
             </div>
 

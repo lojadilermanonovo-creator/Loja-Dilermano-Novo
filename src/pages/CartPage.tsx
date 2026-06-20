@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '@/src/contexts/CartContext';
 import { useFreeShippingThreshold } from '@/src/hooks/useFreeShippingThreshold';
+import { useAuth } from '@/src/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, Truck, Tag, X } from 'lucide-react';
@@ -22,6 +23,7 @@ export default function CartPage() {
   } = useCart();
   const freeShippingThreshold = useFreeShippingThreshold();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [couponCode, setCouponCode] = useState('');
   const [applying, setApplying] = useState(false);
@@ -36,6 +38,11 @@ export default function CartPage() {
     e.preventDefault();
     if (!couponCode.trim()) {
       toast.error('Informe o código do cupom.');
+      return;
+    }
+    if (!user) {
+      toast.error('Faça login para aplicar cupons de desconto e continuar sua compra.');
+      navigate('/login?redirect=/carrinho');
       return;
     }
     setApplying(true);

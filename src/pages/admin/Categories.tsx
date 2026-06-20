@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import ImageUploader from '@/src/components/admin/ImageUploader';
 
 const AVAILABLE_SIZES = [
   'PP', 'P', 'M', 'G', 'GG', 'XGG',
@@ -298,13 +299,12 @@ export default function AdminCategories() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="cat-url" className="text-slate-700 font-semibold text-xs">URL da Imagem Banner</Label>
-              <Input 
-                id="cat-url" 
-                value={imageUrl} 
-                onChange={(e) => setImageUrl(e.target.value)} 
-                placeholder="https://images.unsplash.com/photo-..." 
-                className="rounded-xl border-slate-200 text-sm"
+              <ImageUploader
+                value={imageUrl}
+                onChange={setImageUrl}
+                folder="categories"
+                label="Imagem de Banner da Categoria"
+                placeholder="Cole a URL ou suba um arquivo"
               />
             </div>
 

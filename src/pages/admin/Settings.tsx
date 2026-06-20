@@ -13,6 +13,7 @@ import {
   Megaphone, Palette, Trash2, AlertTriangle, Download
 } from 'lucide-react';
 import { useAuth } from '@/src/contexts/AuthContext';
+import ImageUploader from '@/src/components/admin/ImageUploader';
 import { 
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription 
 } from '@/components/ui/dialog';
@@ -22,13 +23,39 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'melhorenvio' | 'promocta'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'melhorenvio' | 'promocta' | 'footer'>('general');
 
   // States for general config
-  const [storeName, setStoreName] = useState('Dilermando Store');
+  const [storeName, setStoreName] = useState('Dilermano Store');
   const [whatsapp, setWhatsapp] = useState('');
   const [pixKey, setPixKey] = useState('');
+  const [pixQrCodeUrl, setPixQrCodeUrl] = useState('');
   const [pickupAddress, setPickupAddress] = useState('');
+
+  // States for Footer config
+  const [footerStoreName, setFooterStoreName] = useState('DILERMANO');
+  const [footerInstText, setFooterInstText] = useState('Estilo e qualidade para quem busca o melhor do vestuário.');
+  const [footerInstagram, setFooterInstagram] = useState('https://instagram.com/dilermano.oficial');
+  const [footerEmail, setFooterEmail] = useState('dilermano3535@gmail.com');
+  const [footerPhone, setFooterPhone] = useState('(91) 98399-7964');
+  const [footerAddress, setFooterAddress] = useState('Rua Primeiro de Maio, 371\nBairro Centro - Abaetetuba/PA');
+  const [footerRazaoSocial, setFooterRazaoSocial] = useState('D S DO CARMO COMERCIO DE VESTUARIO');
+  const [footerCnpj, setFooterCnpj] = useState('51.178.777/0001-81');
+  const [footerLinksTitle, setFooterLinksTitle] = useState('Links Úteis');
+  const [footerContactTitle, setFooterContactTitle] = useState('Central de Atendimento');
+  const [footerCompanyTitle, setFooterCompanyTitle] = useState('Empresa');
+
+  // Interactive Links (Footer Link texts & urls represent independent clean state fields to maximize UI stability)
+  const [footerLink1Text, setFooterLink1Text] = useState('Perguntas Frequentes');
+  const [footerLink1Url, setFooterLink1Url] = useState('/faq');
+  const [footerLink2Text, setFooterLink2Text] = useState('Política de Privacidade');
+  const [footerLink2Url, setFooterLink2Url] = useState('/politica-de-privacidade');
+  const [footerLink3Text, setFooterLink3Text] = useState('Termos de Uso');
+  const [footerLink3Url, setFooterLink3Url] = useState('/termos-de-uso');
+  const [footerLink4Text, setFooterLink4Text] = useState('Trocas e Devoluções');
+  const [footerLink4Url, setFooterLink4Url] = useState('/trocas-e-devolucoes');
+  const [footerLink5Text, setFooterLink5Text] = useState('');
+  const [footerLink5Url, setFooterLink5Url] = useState('');
 
   // States for Promo CTA
   const [ctaActive, setCtaActive] = useState(true);
@@ -62,18 +89,49 @@ export default function AdminSettings() {
       const docSnap = await getDoc(doc(db, 'settings', 'general'));
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setStoreName(data.storeName || 'Dilermando Store');
+        setStoreName(data.storeName || 'Dilermano Store');
         setWhatsapp(data.whatsapp || '');
         setPixKey(data.pixKey || '');
+        setPixQrCodeUrl(data.pixQrCodeUrl || '');
         setPickupAddress(data.pickupAddress || '');
       } else {
         await setDoc(doc(db, 'settings', 'general'), {
-          storeName: 'Dilermando Store',
+          storeName: 'Dilermano Store',
           whatsapp: '',
           pixKey: '',
+          pixQrCodeUrl: '',
           pickupAddress: '',
           createdAt: serverTimestamp(),
         });
+      }
+
+      // 1b. Footer Config
+      const footerSnap = await getDoc(doc(db, 'settings', 'footer'));
+      if (footerSnap.exists()) {
+        const data = footerSnap.data();
+        setFooterStoreName(data.storeName || 'DILERMANO');
+        setFooterInstText(data.institutionalText || 'Estilo e qualidade para quem busca o melhor do vestuário.');
+        setFooterInstagram(data.instagramUrl || 'https://instagram.com/dilermano.oficial');
+        setFooterEmail(data.email || 'dilermano3535@gmail.com');
+        setFooterPhone(data.phone || '(91) 98399-7964');
+        setFooterAddress(data.address || 'Rua Primeiro de Maio, 371\nBairro Centro - Abaetetuba/PA');
+        setFooterRazaoSocial(data.razaoSocial || 'D S DO CARMO COMERCIO DE VESTUARIO');
+        setFooterCnpj(data.cnpj || '51.178.777/0001-81');
+        setFooterLinksTitle(data.linksTitle || 'Links Úteis');
+        setFooterContactTitle(data.contactTitle || 'Central de Atendimento');
+        setFooterCompanyTitle(data.companyTitle || 'Empresa');
+        
+        const lks = data.links || [];
+        setFooterLink1Text(lks[0]?.text || 'Perguntas Frequentes');
+        setFooterLink1Url(lks[0]?.url || '/faq');
+        setFooterLink2Text(lks[1]?.text || 'Política de Privacidade');
+        setFooterLink2Url(lks[1]?.url || '/politica-de-privacidade');
+        setFooterLink3Text(lks[2]?.text || 'Termos de Uso');
+        setFooterLink3Url(lks[2]?.url || '/termos-de-uso');
+        setFooterLink4Text(lks[3]?.text || 'Trocas e Devoluções');
+        setFooterLink4Url(lks[3]?.url || '/trocas-e-devolucoes');
+        setFooterLink5Text(lks[4]?.text || '');
+        setFooterLink5Url(lks[4]?.url || '');
       }
 
       // 2. Melhor Envio Settings
@@ -145,12 +203,48 @@ export default function AdminSettings() {
         storeName,
         whatsapp,
         pixKey,
+        pixQrCodeUrl,
         pickupAddress,
         updatedAt: serverTimestamp(),
       });
       toast.success('Configurações gerais atualizadas com sucesso!');
     } catch (e) {
       toast.error('Erro ao salvar as configurações gerais');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveFooter = async () => {
+    setSaving(true);
+    try {
+      // Assemble structured links list keeping only those with at least a URL or text
+      const links = [];
+      if (footerLink1Text || footerLink1Url) links.push({ text: footerLink1Text, url: footerLink1Url });
+      if (footerLink2Text || footerLink2Url) links.push({ text: footerLink2Text, url: footerLink2Url });
+      if (footerLink3Text || footerLink3Url) links.push({ text: footerLink3Text, url: footerLink3Url });
+      if (footerLink4Text || footerLink4Url) links.push({ text: footerLink4Text, url: footerLink4Url });
+      if (footerLink5Text || footerLink5Url) links.push({ text: footerLink5Text, url: footerLink5Url });
+
+      await setDoc(doc(db, 'settings', 'footer'), {
+        storeName: footerStoreName,
+        institutionalText: footerInstText,
+        instagramUrl: footerInstagram,
+        email: footerEmail,
+        phone: footerPhone,
+        address: footerAddress,
+        razaoSocial: footerRazaoSocial,
+        cnpj: footerCnpj,
+        linksTitle: footerLinksTitle,
+        contactTitle: footerContactTitle,
+        companyTitle: footerCompanyTitle,
+        links,
+        updatedAt: serverTimestamp()
+      });
+      toast.success('Configurações do rodapé atualizadas com sucesso!');
+    } catch (e) {
+      toast.error('Erro ao salvar as configurações do rodapé');
+      console.error(e);
     } finally {
       setSaving(false);
     }
@@ -379,7 +473,7 @@ export default function AdminSettings() {
             Configurações do Sistema
           </h1>
           <p className="text-slate-500 mt-1">
-            Modifique chaves e informações operacionais do e-commerce Dilermando.
+            Modifique chaves e informações operacionais do e-commerce.
           </p>
         </div>
       </div>
@@ -415,6 +509,16 @@ export default function AdminSettings() {
           }`}
         >
           Frete (Melhor Envio)
+        </button>
+        <button
+          onClick={() => setActiveTab('footer')}
+          className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
+            activeTab === 'footer'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Rodapé (Footer)
         </button>
       </div>
 
@@ -485,7 +589,7 @@ export default function AdminSettings() {
                     Chave PIX exibida na conclusão de compra para os compradores.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-6 space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="pref-pix" className="text-xs font-semibold text-slate-705">Chave PIX de Recebimento</Label>
                     <Input 
@@ -495,6 +599,19 @@ export default function AdminSettings() {
                       onChange={(e) => setPixKey(e.target.value)}
                       className="rounded-xl border-slate-200 h-10 bg-white" 
                     />
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100">
+                    <ImageUploader
+                      value={pixQrCodeUrl}
+                      onChange={setPixQrCodeUrl}
+                      folder="settings"
+                      label="QR Code PIX Personalizado (Upload Opcional)"
+                      placeholder="Cole a URL ou faça upload da imagem do seu QR Code PIX"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Se você enviar uma imagem de QR Code PIX, ela será mostrada na página de sucesso do pedido no checkout. Caso contrário, a tela gerará um QR Code automaticamente a partir da chave PIX acima.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -930,6 +1047,312 @@ export default function AdminSettings() {
                 >
                   <RefreshCw className={`h-4 w-4 ${connecting ? 'animate-spin' : ''}`} /> 
                   Conectar ao Melhor Envio
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'footer' && (
+            <div className="space-y-6 animate-fade-in">
+              {/* Card - Perfil do Rodapé */}
+              <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50 border-b p-6">
+                  <CardTitle className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <Store className="h-4 w-4 text-blue-500" /> Perfil Institucional
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Configure os dados básicos de identificação da marca mostrados na primeira coluna.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="foot-store" className="text-xs font-semibold text-slate-705">Nome Fantasia (Cabeçalho do rodapé)</Label>
+                      <Input
+                        id="foot-store"
+                        value={footerStoreName}
+                        onChange={(e) => setFooterStoreName(e.target.value)}
+                        placeholder="Dilermano"
+                        className="rounded-xl border-slate-200 h-10 bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="foot-insta" className="text-xs font-semibold text-slate-705">Link do Instagram</Label>
+                      <Input
+                        id="foot-insta"
+                        value={footerInstagram}
+                        onChange={(e) => setFooterInstagram(e.target.value)}
+                        placeholder="https://instagram.com/..."
+                        className="rounded-xl border-slate-200 h-10 bg-white font-mono text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="foot-instText" className="text-xs font-semibold text-slate-705">Texto Institucional / Slogan curto</Label>
+                    <textarea
+                      id="foot-instText"
+                      value={footerInstText}
+                      onChange={(e) => setFooterInstText(e.target.value)}
+                      placeholder="Descreva a identidade da sua loja de forma resumida..."
+                      className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:ring-1 focus:ring-blue-500 min-h-[80px]"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card - Atendimento e Endereço */}
+              <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50 border-b p-6">
+                  <CardTitle className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-green-500" /> Contatos & Localização
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Endereços e canais de atendimento que aparecerão no rodapé.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="foot-phone" className="text-xs font-semibold text-slate-705">Telefone de Atendimento</Label>
+                      <Input
+                        id="foot-phone"
+                        value={footerPhone}
+                        onChange={(e) => setFooterPhone(e.target.value)}
+                        placeholder="(91) 98399-7964"
+                        className="rounded-xl border-slate-200 h-10 bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="foot-email" className="text-xs font-semibold text-slate-705">E-mail Comercial</Label>
+                      <Input
+                        id="foot-email"
+                        value={footerEmail}
+                        onChange={(e) => setFooterEmail(e.target.value)}
+                        placeholder="contato@dilermano.com.br"
+                        className="rounded-xl border-slate-200 h-10 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="foot-address" className="text-xs font-semibold text-slate-705">Endereço Comercial</Label>
+                    <textarea
+                      id="foot-address"
+                      value={footerAddress}
+                      onChange={(e) => setFooterAddress(e.target.value)}
+                      placeholder="Identificação do Logradouro, Número, Bairro, Cidade/Estado"
+                      className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:ring-1 focus:ring-blue-500 min-h-[60px]"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card - Informações Empresa e CNPJ */}
+              <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50 border-b p-6">
+                  <CardTitle className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-emerald-500" /> Detalhes Legais (Empresa)
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Razão Social e CNPJ exibidos para total transparência e conformidade legal.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="foot-razao" className="text-xs font-semibold text-slate-705">Razão Social</Label>
+                      <Input
+                        id="foot-razao"
+                        value={footerRazaoSocial}
+                        onChange={(e) => setFooterRazaoSocial(e.target.value)}
+                        placeholder="D S DO CARMO COMERCIO..."
+                        className="rounded-xl border-slate-200 h-10 bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="foot-cnpj" className="text-xs font-semibold text-slate-705">CNPJ</Label>
+                      <Input
+                        id="foot-cnpj"
+                        value={footerCnpj}
+                        onChange={(e) => setFooterCnpj(e.target.value)}
+                        placeholder="51.178.777/0001-81"
+                        className="rounded-xl border-slate-200 h-10 bg-white font-mono"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card - Títulos de Seções e Links Úteis */}
+              <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50 border-b p-6">
+                  <CardTitle className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-pink-500" /> Títulos & Links Internos
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Altere os títulos das listas do rodapé e configure os links de navegação adicionais.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  {/* Seção de Títulos */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-slate-100 pb-6">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="foot-lbl-links" className="text-xs font-semibold text-slate-707">Seção Coluna 2 (Links)</Label>
+                      <Input
+                        id="foot-lbl-links"
+                        value={footerLinksTitle}
+                        onChange={(e) => setFooterLinksTitle(e.target.value)}
+                        className="rounded-xl border-slate-200 h-10 bg-white font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="foot-lbl-cont" className="text-xs font-semibold text-slate-707">Seção Coluna 3 (Contatos)</Label>
+                      <Input
+                        id="foot-lbl-cont"
+                        value={footerContactTitle}
+                        onChange={(e) => setFooterContactTitle(e.target.value)}
+                        className="rounded-xl border-slate-200 h-10 bg-white font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="foot-lbl-comp" className="text-xs font-semibold text-slate-707">Seção Coluna 4 (Empresa)</Label>
+                      <Input
+                        id="foot-lbl-comp"
+                        value={footerCompanyTitle}
+                        onChange={(e) => setFooterCompanyTitle(e.target.value)}
+                        className="rounded-xl border-slate-200 h-10 bg-white font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Links Úteis Interativos */}
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Links de Navegação do Rodapé</h3>
+
+                    <div className="space-y-3">
+                      {/* Link 1 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-50 border rounded-xl">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Texto do Link 1</Label>
+                          <Input
+                            value={footerLink1Text}
+                            onChange={(e) => setFooterLink1Text(e.target.value)}
+                            placeholder="Ex: Perguntas Frequentes"
+                            className="h-9 bg-white text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Destino / Rota 1</Label>
+                          <Input
+                            value={footerLink1Url}
+                            onChange={(e) => setFooterLink1Url(e.target.value)}
+                            placeholder="Ex: /faq"
+                            className="h-9 bg-white text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Link 2 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-50 border rounded-xl">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Texto do Link 2</Label>
+                          <Input
+                            value={footerLink2Text}
+                            onChange={(e) => setFooterLink2Text(e.target.value)}
+                            placeholder="Ex: Política de Privacidade"
+                            className="h-9 bg-white text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Destino / Rota 2</Label>
+                          <Input
+                            value={footerLink2Url}
+                            onChange={(e) => setFooterLink2Url(e.target.value)}
+                            placeholder="Ex: /politica"
+                            className="h-9 bg-white text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Link 3 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-50 border rounded-xl">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Texto do Link 3</Label>
+                          <Input
+                            value={footerLink3Text}
+                            onChange={(e) => setFooterLink3Text(e.target.value)}
+                            placeholder="Ex: Termos de Uso"
+                            className="h-9 bg-white text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Destino / Rota 3</Label>
+                          <Input
+                            value={footerLink3Url}
+                            onChange={(e) => setFooterLink3Url(e.target.value)}
+                            placeholder="Ex: /termos-de-uso"
+                            className="h-9 bg-white text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Link 4 */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-50 border rounded-xl">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Texto do Link 4</Label>
+                          <Input
+                            value={footerLink4Text}
+                            onChange={(e) => setFooterLink4Text(e.target.value)}
+                            placeholder="Ex: Trocas e Devoluções"
+                            className="h-9 bg-white text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Destino / Rota 4</Label>
+                          <Input
+                            value={footerLink4Url}
+                            onChange={(e) => setFooterLink4Url(e.target.value)}
+                            placeholder="Ex: /trocas-e-devolucoes"
+                            className="h-9 bg-white text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Link 5 (Extra) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-50 border rounded-xl">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Texto do Link 5 (Opcional)</Label>
+                          <Input
+                            value={footerLink5Text}
+                            onChange={(e) => setFooterLink5Text(e.target.value)}
+                            placeholder="Ex: Contato Direct"
+                            className="h-9 bg-white text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-bold text-slate-500 uppercase">Destino / Rota 5 (Opcional)</Label>
+                          <Input
+                            value={footerLink5Url}
+                            onChange={(e) => setFooterLink5Url(e.target.value)}
+                            placeholder="Ex: /contato"
+                            className="h-9 bg-white text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Form Save Bar */}
+              <div className="flex justify-end pt-4">
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl gap-2 h-11 px-8 cursor-pointer shadow-lg shadow-blue-500/10"
+                  onClick={handleSaveFooter}
+                  disabled={saving}
+                >
+                  <Save className="h-4 w-4" /> {saving ? 'Salvando...' : 'Salvar Alterações do Rodapé'}
                 </Button>
               </div>
             </div>
