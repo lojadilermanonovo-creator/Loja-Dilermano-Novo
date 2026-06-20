@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '@/src/integrations/firebase/client';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 
 const STATIC_SLIDES = [
   {
@@ -25,32 +26,43 @@ const STATIC_SLIDES = [
 export default function HeroCarousel() {
   const [slides, setSlides] = useState<any[]>(STATIC_SLIDES);
   const [current, setCurrent] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchBanners = async () => {
       try {
         const q = query(
           collection(db, 'banners'),
-          where('isActive', '==', true),
-          orderBy('sortOrder', 'asc')
+          where('isActive', '==', true)
         );
         const snap = await getDocs(q);
         if (!snap.empty) {
-          setSlides(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          const loadedSlides = snap.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              title: data.name || '',
+              subtitle: data.subtitle || '',
+              imageUrl: data.imageUrl || '',
+              link: data.link || '',
+              sortOrder: data.sortOrder,
+              createdAt: data.createdAt ? (data.createdAt.seconds || 0) : 0,
+              ...data
+            };
+          });
+
+          // Sort in memory by sortOrder first, then fallback to createdAt path
+          loadedSlides.sort((a, b) => {
+            const orderA = a.sortOrder !== undefined ? Number(a.sortOrder) : Number.MAX_SAFE_INTEGER;
+            const orderB = b.sortOrder !== undefined ? Number(b.sortOrder) : Number.MAX_SAFE_INTEGER;
+            if (orderA !== orderB) return orderA - orderB;
+            return a.createdAt - b.createdAt;
+          });
+
+          setSlides(loadedSlides);
         }
       } catch (err) {
-        // Fallback silently or fetch simple get if index is not ready yet
-        try {
-          const snap = await getDocs(collection(db, 'banners'));
-          const activeList = snap.docs
-            .map(doc => ({ id: doc.id, ...doc.data() as any }))
-            .filter(b => b.isActive !== false);
-          if (activeList.length > 0) {
-            setSlides(activeList);
-          }
-        } catch (e) {
-          console.warn("Banners collection fallback loaded STATIC_SLIDES:", e);
-        }
+        console.warn("Banners collection fallback loaded STATIC_SLIDES:", err);
       }
     };
     fetchBanners();
@@ -64,8 +76,13 @@ export default function HeroCarousel() {
     return () => clearInterval(timer);
   }, [slides]);
 
-  const handleScrollToCategories = () => {
-    document.getElementById('categorias')?.scrollIntoView({ behavior: 'smooth' });
+  const handleAction = () => {
+    const currentSlide = slides[current];
+    if (currentSlide && currentSlide.link) {
+      navigate(currentSlide.link);
+    } else {
+      document.getElementById('categorias')?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   if (slides.length === 0) return null;
@@ -105,7 +122,7 @@ export default function HeroCarousel() {
                 <Button 
                   size="lg" 
                   className="font-bold h-14 px-10 rounded-full text-lg shadow-xl bg-white text-black hover:bg-neutral-200"
-                  onClick={handleScrollToCategories}
+                  onClick={handleAction}
                 >
                   Comprar Agora
                 </Button>
