@@ -23,7 +23,8 @@ service cloud.firestore {
 
     match /products/{id} {
       allow read;
-      allow write: if isAdmin() && isValidProduct(request.resource.data);
+      allow create, update: if isAdmin() && isValidProduct(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /categories/{id} {

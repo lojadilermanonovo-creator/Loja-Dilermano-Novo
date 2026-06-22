@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, X, Image as ImageIcon, Star, ArrowLeft, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
+import ImageUploader from './ImageUploader';
 
 interface ProductImageManagerProps {
   images: { url: string }[];
@@ -137,6 +138,22 @@ export default function ProductImageManager({ images, onChange }: ProductImageMa
           <Plus className="h-4 w-4 mr-1" /> Adicionar
         </Button>
       </div>
+
+      {images.length < 3 && (
+        <div className="pt-2 border-t border-slate-100 mt-2">
+          <ImageUploader
+            value=""
+            onChange={(url) => {
+              if (url) {
+                onChange([...images, { url }]);
+              }
+            }}
+            folder="products"
+            label="Ou faça upload de arquivo"
+            placeholder="Escolha um arquivo JPEG, JPG ou PNG"
+          />
+        </div>
+      )}
     </div>
   );
 }
