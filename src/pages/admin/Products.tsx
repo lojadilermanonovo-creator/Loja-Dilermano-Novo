@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { db } from '@/src/integrations/firebase/client';
+import { db, auth } from '@/src/integrations/firebase/client';
 import { collection, query, getDocs, deleteDoc, doc, orderBy } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,8 @@ export default function AdminProducts() {
       await deleteDoc(doc(db, 'products', id));
       toast.success('Produto excluído com sucesso');
       fetchProducts();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Erro ao excluir produto:', error);
       toast.error('Erro ao excluir produto');
     }
   };
