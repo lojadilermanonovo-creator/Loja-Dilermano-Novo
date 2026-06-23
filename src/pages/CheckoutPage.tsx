@@ -35,6 +35,9 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
 
   const [address, setAddress] = useState({
+    name: '',
+    receiverName: '',
+    receiverPhone: '',
     fullName: '',
     zipCode: '',
     street: '',
@@ -48,6 +51,7 @@ export default function CheckoutPage() {
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [loadingCep, setLoadingCep] = useState(false);
 
   useEffect(() => {
     const fetchUserAddresses = async () => {
@@ -66,6 +70,9 @@ export default function CheckoutPage() {
             const defaultAddr = list.find(a => a.isDefault) || list[0];
             setSelectedAddressId(defaultAddr.id);
             setAddress({
+              name: defaultAddr.name || '',
+              receiverName: defaultAddr.receiverName || user.displayName || userData.fullName || '',
+              receiverPhone: defaultAddr.receiverPhone || '',
               fullName: defaultAddr.receiverName || user.displayName || userData.fullName || '',
               zipCode: defaultAddr.zipCode,
               street: defaultAddr.street,
@@ -91,6 +98,9 @@ export default function CheckoutPage() {
     setSelectedAddressId(addrId);
     if (addrId === 'manual') {
       setAddress({
+        name: '',
+        receiverName: '',
+        receiverPhone: '',
         fullName: '',
         zipCode: '',
         street: '',
@@ -106,6 +116,9 @@ export default function CheckoutPage() {
     const selected = savedAddresses.find(a => a.id === addrId);
     if (selected) {
       setAddress({
+        name: selected.name || '',
+        receiverName: selected.receiverName || '',
+        receiverPhone: selected.receiverPhone || '',
         fullName: selected.receiverName || user?.displayName || '',
         zipCode: selected.zipCode,
         street: selected.street,
@@ -115,6 +128,47 @@ export default function CheckoutPage() {
         city: selected.city,
         state: selected.state
       });
+    }
+  };
+
+  // Format CEP dynamically (99999-999)
+  const formatCEP = (value: string) => {
+    const raw = value.replace(/\D/g, '').slice(0, 8);
+    if (raw.length > 5) {
+      return `${raw.slice(0, 5)}-${raw.slice(5)}`;
+    }
+    return raw;
+  };
+
+  const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCEP(e.target.value);
+    setAddress(prev => ({ ...prev, zipCode: formatted }));
+
+    const clean = formatted.replace(/\D/g, '');
+    if (clean.length === 8) {
+      setLoadingCep(true);
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+        if (!response.ok) throw new Error('ViaCEP offline');
+        const data = await response.json();
+        if (data.erro) {
+          toast.warning('CEP não encontrado. Por favor, preencha manualmente.');
+        } else {
+          setAddress(prev => ({
+            ...prev,
+            street: data.logradouro || '',
+            neighborhood: data.bairro || '',
+            city: data.localidade || '',
+            state: data.uf || ''
+          }));
+          toast.success('Endereço autocompletado com sucesso!');
+        }
+      } catch (err) {
+        console.warn('ViaCEP API error:', err);
+        toast.warning('Não foi possível buscar o CEP automaticamente. Você pode preenchê-lo manualmente.');
+      } finally {
+        setLoadingCep(false);
+      }
     }
   };
 
@@ -390,38 +444,129 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="fullName" className="text-xs font-bold text-slate-600">Nome Completo</Label>
-                <Input id="fullName" required value={address.fullName} onChange={e => setAddress({...address, fullName: e.target.value})} className="rounded-xl border-slate-200 h-10" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label htmlFor="addrName" className="text-[11px] font-bold text-slate-600">Identificação do Endereço *</Label>
+                <Input 
+                  id="addrName" 
+                  required 
+                  placeholder="Ex: Minha Casa, Escritório, Avós" 
+                  value={address.name} 
+                  onChange={e => setAddress({ ...address, name: e.target.value })} 
+                  className="bg-white rounded-xl border-slate-200 h-10 text-sm" 
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="zipCode" className="text-xs font-bold text-slate-600">CEP</Label>
-                <Input id="zipCode" placeholder="Ex: 00000-000" required value={address.zipCode} onChange={e => setAddress({...address, zipCode: e.target.value})} className="rounded-xl border-slate-200 h-10 font-mono" />
+
+              <div className="space-y-1.5">
+                <Label htmlFor="receiverName" className="text-[11px] font-bold text-slate-600">Destinatário *</Label>
+                <Input 
+                  id="receiverName" 
+                  required 
+                  placeholder="Nome de quem recebe" 
+                  value={address.receiverName} 
+                  onChange={e => setAddress({ ...address, receiverName: e.target.value, fullName: e.target.value })} 
+                  className="bg-white rounded-xl border-slate-200 h-10 text-sm" 
+                />
               </div>
-              <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="street" className="text-xs font-bold text-slate-600">Rua</Label>
-                <Input id="street" required value={address.street} onChange={e => setAddress({...address, street: e.target.value})} className="rounded-xl border-slate-200 h-10" />
+
+              <div className="space-y-1.5">
+                <Label htmlFor="receiverPhone" className="text-[11px] font-bold text-slate-600">Telefone *</Label>
+                <Input 
+                  id="receiverPhone" 
+                  required 
+                  placeholder="Ex: (11) 99999-9999" 
+                  value={address.receiverPhone} 
+                  onChange={e => setAddress({ ...address, receiverPhone: e.target.value })} 
+                  className="bg-white rounded-xl border-slate-200 h-10 text-sm font-mono" 
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="number" className="text-xs font-bold text-slate-600">Número</Label>
-                <Input id="number" required value={address.number} onChange={e => setAddress({...address, number: e.target.value})} className="rounded-xl border-slate-200 h-10" />
+
+              <div className="space-y-1.5">
+                <Label htmlFor="zipCode" className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                  CEP *
+                  {loadingCep && <RefreshCw className="h-3 w-3 text-blue-600 animate-spin" />}
+                </Label>
+                <Input 
+                  id="zipCode" 
+                  required 
+                  placeholder="00000-000" 
+                  value={address.zipCode} 
+                  onChange={handleCepChange} 
+                  className="bg-white rounded-xl border-slate-200 h-10 text-sm font-mono" 
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="complement" className="text-xs font-bold text-slate-600">Complemento</Label>
-                <Input id="complement" value={address.complement} onChange={e => setAddress({...address, complement: e.target.value})} className="rounded-xl border-slate-200 h-10" />
+
+              <div className="space-y-1.5">
+                <Label htmlFor="number" className="text-[11px] font-bold text-slate-600">Número *</Label>
+                <Input 
+                  id="number" 
+                  required 
+                  placeholder="Ex: 123, S/N" 
+                  value={address.number} 
+                  onChange={e => setAddress({ ...address, number: e.target.value })} 
+                  className="bg-white rounded-xl border-slate-200 h-10 text-sm" 
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="neighborhood" className="text-xs font-bold text-slate-600">Bairro</Label>
-                <Input id="neighborhood" required value={address.neighborhood} onChange={e => setAddress({...address, neighborhood: e.target.value})} className="rounded-xl border-slate-200 h-10" />
+
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label htmlFor="street" className="text-[11px] font-bold text-slate-600">Rua *</Label>
+                <Input 
+                  id="street" 
+                  required 
+                  placeholder="Logradouro" 
+                  value={address.street} 
+                  onChange={e => setAddress({ ...address, street: e.target.value })} 
+                  className="bg-white rounded-xl border-slate-200 h-10 text-sm" 
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="city" className="text-xs font-bold text-slate-600">Cidade</Label>
-                <Input id="city" required value={address.city} onChange={e => setAddress({...address, city: e.target.value})} className="rounded-xl border-slate-200 h-10" />
+
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label htmlFor="complement" className="text-[11px] font-bold text-slate-600">Complemento (opcional)</Label>
+                <Input 
+                  id="complement" 
+                  placeholder="Ex: Apto 42, Bloco B" 
+                  value={address.complement} 
+                  onChange={e => setAddress({ ...address, complement: e.target.value })} 
+                  className="bg-white rounded-xl border-slate-200 h-10 text-sm" 
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="state" className="text-xs font-bold text-slate-600">Estado</Label>
-                <Input id="state" required value={address.state} onChange={e => setAddress({...address, state: e.target.value})} className="rounded-xl border-slate-200 h-10" />
+
+              <div className="space-y-1.5">
+                <Label htmlFor="neighborhood" className="text-[11px] font-bold text-slate-600">Bairro *</Label>
+                <Input 
+                  id="neighborhood" 
+                  required 
+                  placeholder="Bairro" 
+                  value={address.neighborhood} 
+                  onChange={e => setAddress({ ...address, neighborhood: e.target.value })} 
+                  className="bg-white rounded-xl border-slate-200 h-10 text-sm" 
+                />
+              </div>
+
+              <div className="grid grid-cols-3 sm:col-span-1 gap-2">
+                <div className="col-span-2 space-y-1.5">
+                  <Label htmlFor="city" className="text-[11px] font-bold text-slate-600">Cidade *</Label>
+                  <Input 
+                    id="city" 
+                    required 
+                    placeholder="Cidade" 
+                    value={address.city} 
+                    onChange={e => setAddress({ ...address, city: e.target.value })} 
+                    className="bg-white rounded-xl border-slate-200 h-10 text-xs" 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="stateCode" className="text-[11px] font-bold text-slate-600">UF *</Label>
+                  <Input 
+                    id="stateCode" 
+                    required 
+                    placeholder="UF" 
+                    maxLength={2} 
+                    value={address.state} 
+                    onChange={e => setAddress({ ...address, state: e.target.value.toUpperCase() })} 
+                    className="bg-white rounded-xl border-slate-200 h-10 text-xs uppercase text-center font-bold" 
+                  />
+                </div>
               </div>
             </div>
 

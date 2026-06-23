@@ -1,12 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Menu, X, Sparkles } from 'lucide-react';
 import AdminSidebar from '@/src/components/AdminSidebar';
 import { Button } from '@/components/ui/button';
 import { AnimatePresence, motion } from 'motion/react';
+import { db } from '@/src/integrations/firebase/client';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [adminBrandName, setAdminBrandName] = useState('Dilermando');
+
+  useEffect(() => {
+    const fetchBrandName = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'general'));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.adminBrandName) {
+            setAdminBrandName(data.adminBrandName);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching admin brand name:', err);
+      }
+    };
+    fetchBrandName();
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
@@ -59,7 +79,7 @@ export default function AdminLayout() {
               <Sparkles className="h-4.5 w-4.5" />
             </span>
             <span className="font-black tracking-tighter text-slate-900 text-lg uppercase">
-              Dilermando
+              {adminBrandName}
             </span>
           </div>
 
