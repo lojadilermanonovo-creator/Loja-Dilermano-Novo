@@ -10,8 +10,23 @@ import { db, functions } from '@/src/integrations/firebase/client';
 import { collection, addDoc, serverTimestamp, runTransaction, doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, MapPin, Truck, AlertCircle, Tag, MessageCircle } from 'lucide-react';
+import { RefreshCw, MapPin, Truck, AlertCircle, Tag, MessageCircle, Plus } from 'lucide-react';
 import { calculateShippingMock } from '@/src/utils/shipping';
+
+interface SavedAddress {
+  id: string;
+  name: string;
+  receiverName: string;
+  receiverPhone: string;
+  zipCode: string;
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  isDefault: boolean;
+}
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart, appliedCoupon, discountAmount } = useCart();
@@ -29,6 +44,79 @@ export default function CheckoutPage() {
     city: '',
     state: ''
   });
+
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserAddresses = async () => {
+      if (!user) return;
+      setLoadingAddresses(true);
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          const list: SavedAddress[] = userData.addresses || [];
+          setSavedAddresses(list);
+          
+          if (list.length > 0) {
+            // Find default address, else use first
+            const defaultAddr = list.find(a => a.isDefault) || list[0];
+            setSelectedAddressId(defaultAddr.id);
+            setAddress({
+              fullName: defaultAddr.receiverName || user.displayName || userData.fullName || '',
+              zipCode: defaultAddr.zipCode,
+              street: defaultAddr.street,
+              number: defaultAddr.number,
+              complement: defaultAddr.complement || '',
+              neighborhood: defaultAddr.neighborhood,
+              city: defaultAddr.city,
+              state: defaultAddr.state
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao carregar endereços do usuário:', err);
+      } finally {
+        setLoadingAddresses(false);
+      }
+    };
+
+    fetchUserAddresses();
+  }, [user]);
+
+  const handleSelectSavedAddress = (addrId: string) => {
+    setSelectedAddressId(addrId);
+    if (addrId === 'manual') {
+      setAddress({
+        fullName: '',
+        zipCode: '',
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        city: '',
+        state: ''
+      });
+      return;
+    }
+
+    const selected = savedAddresses.find(a => a.id === addrId);
+    if (selected) {
+      setAddress({
+        fullName: selected.receiverName || user?.displayName || '',
+        zipCode: selected.zipCode,
+        street: selected.street,
+        number: selected.number,
+        complement: selected.complement || '',
+        neighborhood: selected.neighborhood,
+        city: selected.city,
+        state: selected.state
+      });
+    }
+  };
 
   // Shipping dynamic states
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
@@ -241,6 +329,67 @@ export default function CheckoutPage() {
             <h2 className="text-xl font-bold flex items-center gap-2">
               <MapPin className="h-5 w-5 text-blue-500" /> Endereço de Entrega
             </h2>
+
+            {user && savedAddresses.length > 0 && (
+              <div className="space-y-3 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5 text-blue-500" /> Endereços Cadastrados ({savedAddresses.length})
+                  </span>
+                  {loadingAddresses && <RefreshCw className="h-3 w-3 animate-spin text-slate-400" />}
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {savedAddresses.map((addr) => {
+                    const isSelected = selectedAddressId === addr.id;
+                    return (
+                      <div
+                        key={addr.id}
+                        onClick={() => handleSelectSavedAddress(addr.id)}
+                        className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1 relative group ${
+                          isSelected
+                            ? 'border-blue-600 bg-white ring-2 ring-blue-100 shadow-sm'
+                            : 'border-slate-200 bg-white hover:bg-slate-50'
+                        }`}
+                      >
+                        {addr.isDefault && (
+                          <span className="absolute top-2.5 right-2 text-[8px] font-extrabold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                            Principal
+                          </span>
+                        )}
+                        <p className={`font-extrabold text-xs line-clamp-1 pr-12 transition-colors ${isSelected ? 'text-blue-600' : 'text-slate-800'}`}>
+                          {addr.name}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                          Para: {addr.receiverName}
+                        </p>
+                        <p className="text-[10px] text-slate-400 leading-normal line-clamp-2 mt-1">
+                          {addr.street}, {addr.number} {addr.complement && `(${addr.complement})`} - {addr.neighborhood}, {addr.city} - {addr.state}
+                        </p>
+                        <p className="text-[9px] font-mono font-bold text-slate-400 mt-1">CEP: {addr.zipCode}</p>
+                      </div>
+                    );
+                  })}
+                  
+                  <div
+                    onClick={() => handleSelectSavedAddress('manual')}
+                    className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5 min-h-[100px] border-dashed ${
+                      selectedAddressId === 'manual'
+                        ? 'border-blue-600 bg-white ring-2 ring-blue-100 shadow-sm text-blue-600'
+                        : 'border-slate-300 bg-slate-50/50 hover:bg-slate-50 text-slate-500 hover:text-slate-600'
+                    }`}
+                  >
+                    <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1">
+                      <Plus className="h-4 w-4" /> Outro Endereço
+                    </span>
+                    <p className="text-[9px] text-slate-400 text-center font-semibold mt-0.5 leading-tight">
+                      Preencher campos abaixo manualmente
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2 space-y-2">
                 <Label htmlFor="fullName" className="text-xs font-bold text-slate-600">Nome Completo</Label>

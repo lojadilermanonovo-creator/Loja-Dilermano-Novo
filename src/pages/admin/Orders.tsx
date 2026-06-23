@@ -65,18 +65,35 @@ export default function AdminOrders() {
         
         const items = orderData.items || [];
         let auditWarning: string | null = null;
+        const uniqueProductIds: string[] = Array.from(new Set(items.map((i: any) => i.productId as string)));
         
-        for (const item of items) {
-          const productRef = doc(db, 'products', item.productId);
+        // Phase 1: All Transaction Reads
+        const productDataMap = new Map<string, { ref: any, data: any }>();
+        for (const productId of uniqueProductIds) {
+          const productRef = doc(db, 'products', productId);
           const productSnap = await transaction.get(productRef);
           
           if (!productSnap.exists()) {
-            // Found a deleted product! Mark warning but continue with others to not lock the UI
-            auditWarning = `Reconciliação parcial: O produto "${item.name}" (ID: ${item.productId}) foi excluído do catálogo, de modo que seu estoque correspondente não pôde ser devolvido.`;
+            const matchingItem = items.find((i: any) => i.productId === productId);
+            const itemName = matchingItem ? matchingItem.name : 'Desconhecido';
+            auditWarning = `Reconciliação parcial: O produto "${itemName}" (ID: ${productId}) foi excluído do catálogo, de modo que seu estoque correspondente não pôde ser devolvido.`;
             continue;
           }
           
-          const productData = productSnap.data();
+          productDataMap.set(productId, {
+            ref: productRef,
+            data: productSnap.data()
+          });
+        }
+        
+        // Phase 2: Compute Restored Stocks Locally
+        for (const item of items) {
+          const productObj = productDataMap.get(item.productId);
+          if (!productObj) {
+            continue;
+          }
+          
+          const productData = productObj.data;
           const quantityToRestore = Number(item.quantity) || 1;
           
           if (productData.variations && productData.variations.length > 0) {
@@ -95,23 +112,23 @@ export default function AdminOrders() {
                 (sum: number, v: any) => sum + (Number(v.stockQuantity) || 0), 
                 0
               );
-              
-              transaction.update(productRef, {
-                variations: productData.variations,
-                stockQuantity: totalStock
-              });
+              productData.stockQuantity = totalStock;
             } else {
               const currentBaseStock = Number(productData.stockQuantity) || 0;
-              transaction.update(productRef, {
-                stockQuantity: currentBaseStock + quantityToRestore
-              });
+              productData.stockQuantity = currentBaseStock + quantityToRestore;
             }
           } else {
             const currentBaseStock = Number(productData.stockQuantity) || 0;
-            transaction.update(productRef, {
-              stockQuantity: currentBaseStock + quantityToRestore
-            });
+            productData.stockQuantity = currentBaseStock + quantityToRestore;
           }
+        }
+        
+        // Phase 3: All Transaction Writes
+        for (const [productId, productObj] of productDataMap.entries()) {
+          transaction.update(productObj.ref, {
+            stockQuantity: productObj.data.stockQuantity,
+            ...(productObj.data.variations ? { variations: productObj.data.variations } : {})
+          });
         }
         
         // Update order state to clear deduction status
@@ -257,15 +274,34 @@ export default function AdminOrders() {
         }
         
         const items = orderData.items || [];
-        for (const item of items) {
-          const productRef = doc(db, 'products', item.productId);
+        const uniqueProductIds: string[] = Array.from(new Set(items.map((i: any) => i.productId as string)));
+        
+        // Phase 1: All Transaction Reads
+        const productDataMap = new Map<string, { ref: any, data: any }>();
+        for (const productId of uniqueProductIds) {
+          const productRef = doc(db, 'products', productId);
           const productSnap = await transaction.get(productRef);
           
           if (!productSnap.exists()) {
-            throw new Error(`Produto Excluído: O produto "${item.name}" (ID: ${item.productId}) foi removido do catálogo de produtos!`);
+            const matchingItem = items.find((i: any) => i.productId === productId);
+            const itemName = matchingItem ? matchingItem.name : 'Desconhecido';
+            throw new Error(`Produto Excluído: O produto "${itemName}" (ID: ${productId}) foi removido do catálogo de produtos!`);
           }
           
-          const productData = productSnap.data();
+          productDataMap.set(productId, {
+            ref: productRef,
+            data: productSnap.data()
+          });
+        }
+        
+        // Phase 2: Compute Stock Deductions Locally
+        for (const item of items) {
+          const productObj = productDataMap.get(item.productId);
+          if (!productObj) {
+            continue;
+          }
+          
+          const productData = productObj.data;
           const quantityToDeduct = Number(item.quantity) || 1;
           
           // Check if this product has variation grades
@@ -291,20 +327,14 @@ export default function AdminOrders() {
                 (sum: number, v: any) => sum + (Number(v.stockQuantity) || 0), 
                 0
               );
-              
-              transaction.update(productRef, {
-                variations: productData.variations,
-                stockQuantity: totalStock
-              });
+              productData.stockQuantity = totalStock;
             } else {
               // Fallback to general stockQuantity of the parent product
               const currentBaseStock = Number(productData.stockQuantity) || 0;
               if (currentBaseStock < quantityToDeduct) {
                 throw new Error(`Estoque Insuficiente: O produto "${item.name}" possui apenas ${currentBaseStock} un., mas o pedido solicita ${quantityToDeduct}.`);
               }
-              transaction.update(productRef, {
-                stockQuantity: currentBaseStock - quantityToDeduct
-              });
+              productData.stockQuantity = currentBaseStock - quantityToDeduct;
             }
           } else {
             // Simple product without variations
@@ -312,10 +342,16 @@ export default function AdminOrders() {
             if (currentBaseStock < quantityToDeduct) {
               throw new Error(`Estoque Insuficiente: O produto "${item.name}" possui apenas ${currentBaseStock} un., mas o pedido solicita ${quantityToDeduct}.`);
             }
-            transaction.update(productRef, {
-              stockQuantity: currentBaseStock - quantityToDeduct
-            });
+            productData.stockQuantity = currentBaseStock - quantityToDeduct;
           }
+        }
+        
+        // Phase 3: All Transaction Writes
+        for (const [productId, productObj] of productDataMap.entries()) {
+          transaction.update(productObj.ref, {
+            stockQuantity: productObj.data.stockQuantity,
+            ...(productObj.data.variations ? { variations: productObj.data.variations } : {})
+          });
         }
         
         // Log paid tracking event in transaction
