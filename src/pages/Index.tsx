@@ -14,6 +14,7 @@ export default function Index() {
   const [categories, setCategories] = useState<any[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
   const [newProducts, setNewProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [promoCTA, setPromoCTA] = useState<any>({
     active: true,
     title: 'Frete Grátis acima de R$ {valor}',
@@ -90,6 +91,8 @@ export default function Index() {
         } else {
           console.error("Home: Error fetching data:", err);
         }
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -140,20 +143,28 @@ export default function Index() {
           </p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {categories.map((category) => (
-            <CategoryCard key={category.id} category={category} />
-          ))}
-          {/* Default categories if none found */}
-          {categories.length === 0 && [
-            { id: 'novidades', name: 'Novidades', imageUrl: 'https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=2070&auto=format&fit=crop' },
-            { id: 'promocoes', name: 'Promoções', imageUrl: 'https://images.unsplash.com/photo-1544441893-675973e31985?q=80&w=2070&auto=format&fit=crop' },
-            { id: 'masculino', name: 'Masculino', imageUrl: 'https://images.unsplash.com/photo-1516257984877-a03a01ae1b89?q=80&w=2070&auto=format&fit=crop' },
-            { id: 'feminino', name: 'Feminino', imageUrl: 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?q=80&w=2070&auto=format&fit=crop' },
-            { id: 'acessorios', name: 'Acessórios', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=2070&auto=format&fit=crop' },
-            { id: 'calcados', name: 'Calçados', imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?q=80&w=2070&auto=format&fit=crop' }
-          ].map(cat => (
-             <CategoryCard key={cat.id} category={cat} />
-          ))}
+          {loading ? (
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="aspect-square rounded-2xl bg-neutral-200 dark:bg-neutral-800 animate-pulse" />
+            ))
+          ) : (
+            <>
+              {categories.map((category) => (
+                <CategoryCard key={category.id} category={category} />
+              ))}
+              {/* Default categories if none found */}
+              {categories.length === 0 && [
+                { id: 'novidades', name: 'Novidades', imageUrl: 'https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=2070&auto=format&fit=crop' },
+                { id: 'promocoes', name: 'Promoções', imageUrl: 'https://images.unsplash.com/photo-1544441893-675973e31985?q=80&w=2070&auto=format&fit=crop' },
+                { id: 'masculino', name: 'Masculino', imageUrl: 'https://images.unsplash.com/photo-1516257984877-a03a01ae1b89?q=80&w=2070&auto=format&fit=crop' },
+                { id: 'feminino', name: 'Feminino', imageUrl: 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?q=80&w=2070&auto=format&fit=crop' },
+                { id: 'acessorios', name: 'Acessórios', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=2070&auto=format&fit=crop' },
+                { id: 'calcados', name: 'Calçados', imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?q=80&w=2070&auto=format&fit=crop' }
+              ].map(cat => (
+                 <CategoryCard key={cat.id} category={cat} />
+              ))}
+            </>
+          )}
         </div>
       </section>
 
@@ -166,10 +177,22 @@ export default function Index() {
           <Button variant="ghost" onClick={() => navigate('/categoria/novidades')}>Ver todos</Button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {newProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-          {newProducts.length === 0 && <p className="col-span-full text-center py-10 text-muted-foreground whitespace-pre-wrap">Nenhum produto em 'Novidades' encontrado. Adicione produtos com a flag 'isNew' no admin.</p>}
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-3">
+                <div className="aspect-[4/5] rounded-2xl bg-neutral-200 dark:bg-neutral-800 animate-pulse" />
+                <div className="h-4 w-3/4 rounded bg-neutral-200 dark:bg-neutral-800 animate-pulse" />
+                <div className="h-4 w-1/2 rounded bg-neutral-200 dark:bg-neutral-800 animate-pulse" />
+              </div>
+            ))
+          ) : (
+            <>
+              {newProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+              {newProducts.length === 0 && <p className="col-span-full text-center py-10 text-muted-foreground whitespace-pre-wrap">Nenhum produto em 'Novidades' encontrado. Adicione produtos com a flag 'isNew' no admin.</p>}
+            </>
+          )}
         </div>
       </section>
 
@@ -182,10 +205,22 @@ export default function Index() {
           <Button variant="ghost" onClick={() => navigate('/categoria/destaques')}>Ver todos</Button>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-          {featuredProducts.length === 0 && <p className="col-span-full text-center py-10 text-muted-foreground">Nenhum produto em 'Destaques' encontrado. Adicione produtos com a flag 'isFeatured' no admin.</p>}
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-3">
+                <div className="aspect-[4/5] rounded-2xl bg-neutral-200 dark:bg-neutral-800 animate-pulse" />
+                <div className="h-4 w-3/4 rounded bg-neutral-200 dark:bg-neutral-800 animate-pulse" />
+                <div className="h-4 w-1/2 rounded bg-neutral-200 dark:bg-neutral-800 animate-pulse" />
+              </div>
+            ))
+          ) : (
+            <>
+              {featuredProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+              {featuredProducts.length === 0 && <p className="col-span-full text-center py-10 text-muted-foreground">Nenhum produto em 'Destaques' encontrado. Adicione produtos com a flag 'isFeatured' no admin.</p>}
+            </>
+          )}
         </div>
       </section>
 

@@ -24,7 +24,8 @@ const STATIC_SLIDES = [
 ];
 
 export default function HeroCarousel() {
-  const [slides, setSlides] = useState<any[]>(STATIC_SLIDES);
+  const [slides, setSlides] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(0);
   const navigate = useNavigate();
 
@@ -60,9 +61,14 @@ export default function HeroCarousel() {
           });
 
           setSlides(loadedSlides);
+        } else {
+          setSlides(STATIC_SLIDES);
         }
       } catch (err) {
         console.warn("Banners collection fallback loaded STATIC_SLIDES:", err);
+        setSlides(STATIC_SLIDES);
+      } finally {
+        setLoading(false);
       }
     };
     fetchBanners();
@@ -84,6 +90,15 @@ export default function HeroCarousel() {
       document.getElementById('categorias')?.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="h-[600px] w-full bg-slate-900 animate-pulse relative flex items-center justify-center">
+        <div className="absolute inset-x-0 inset-y-0 bg-neutral-900/10 backdrop-blur-sm" />
+        <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin relative z-10" />
+      </div>
+    );
+  }
 
   if (slides.length === 0) return null;
 
