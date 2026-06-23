@@ -6,6 +6,7 @@ import { httpsCallable } from 'firebase/functions';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Heart, Truck, ShieldCheck, ArrowLeft, Star } from 'lucide-react';
 import { useCart } from '@/src/contexts/CartContext';
+import { useWishlist } from '@/src/contexts/WishlistContext';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import ProductCard from '@/src/components/ProductCard';
@@ -39,7 +40,20 @@ export default function ProductPage() {
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [calculatingShipping, setCalculatingShipping] = useState(false);
   const { addItem } = useCart();
+  const { isFavorited, toggleFavorite } = useWishlist();
   const navigate = useNavigate();
+
+  const isFav = product ? isFavorited(product.id) : false;
+
+  const handleToggleFavorite = () => {
+    if (!product) return;
+    toggleFavorite({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      images: product.images
+    });
+  };
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -92,6 +106,49 @@ export default function ProductPage() {
     window.scrollTo(0, 0);
   }, [id]);
 
+  const getSelectedStock = () => {
+    if (!product) return 0;
+    
+    const hasSizes = product.selectedSizes?.length > 0;
+    const hasColors = product.selectedColors?.length > 0;
+    
+    if (product.variations && product.variations.length > 0) {
+      const matchingVars = product.variations.filter((v: any) => {
+        let match = true;
+        if (hasSizes && selectedSize) {
+          match = match && (v.size || '').toLowerCase() === selectedSize.toLowerCase();
+        }
+        if (hasColors && selectedColor) {
+          match = match && (v.color || '').toLowerCase() === selectedColor.toLowerCase();
+        }
+        return match;
+      });
+      
+      if (matchingVars.length > 0) {
+        return matchingVars.reduce((sum: number, v: any) => sum + (Number(v.stockQuantity) || 0), 0);
+      }
+      return 0;
+    }
+    
+    return Number(product.stockQuantity) || 0;
+  };
+
+  const maxStockForSelection = getSelectedStock();
+  const isOutOfStockSelection = maxStockForSelection <= 0;
+
+  useEffect(() => {
+    if (product) {
+      const maxStock = getSelectedStock();
+      if (maxStock > 0) {
+        if (quantity > maxStock) {
+          setQuantity(maxStock);
+        }
+      } else {
+        setQuantity(1);
+      }
+    }
+  }, [selectedSize, selectedColor, product]);
+
   const handleAddToCart = () => {
     const categorySizes = product?.category?.allowedSizes;
     const productSizes = product?.selectedSizes;
@@ -129,7 +186,6 @@ export default function ProductPage() {
       imageUrl: product.images?.[0]?.url,
       attributes: Object.keys(attributes).length > 0 ? attributes : undefined
     });
-    toast.success(`${product.name} adicionado ao carrinho!`);
   };
 
   if (loading) {
@@ -287,33 +343,50 @@ export default function ProductPage() {
 
           <div className="flex flex-col gap-4 pt-4">
             <div className="flex items-center gap-4">
-              <div className="flex items-center border rounded-xl overflow-hidden h-14">
+              <div className="flex items-center border rounded-xl overflow-hidden h-14 bg-white">
                 <button 
-                  className="px-4 hover:bg-surface-elevated font-bold"
+                  className="px-4 hover:bg-slate-50 font-bold transition-colors disabled:opacity-40"
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={quantity <= 1 || isOutOfStockSelection}
                 >
                   -
                 </button>
                 <input 
                   type="text" 
-                  value={quantity} 
-                  className="w-12 text-center font-bold outline-none"
+                  value={isOutOfStockSelection ? 0 : quantity} 
+                  className="w-12 text-center font-bold outline-none bg-transparent"
                   readOnly 
                 />
                 <button 
-                  className="px-4 hover:bg-surface-elevated font-bold"
+                  className="px-4 hover:bg-slate-50 font-bold transition-colors disabled:opacity-40"
                   onClick={() => setQuantity(quantity + 1)}
+                  disabled={quantity >= maxStockForSelection || isOutOfStockSelection}
                 >
                   +
                 </button>
               </div>
               <Button 
-                className="flex-1 h-14 rounded-xl font-bold text-lg bg-ocean hover:bg-ocean/90 gap-2"
+                className="flex-1 h-14 rounded-xl font-bold text-lg bg-ocean hover:bg-ocean/90 gap-2 disabled:bg-slate-200 disabled:text-slate-400"
                 onClick={handleAddToCart}
+                disabled={isOutOfStockSelection}
               >
-                <ShoppingCart className="h-5 w-5" /> Adicionar ao Carrinho
+                <ShoppingCart className="h-5 w-5" /> {isOutOfStockSelection ? 'Sem Estoque' : 'Adicionar ao Carrinho'}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-14 w-14 rounded-xl border-2 flex items-center justify-center hover:bg-slate-50 transition-all group shrink-0"
+                onClick={handleToggleFavorite}
+                title={isFav ? "Remover dos Favoritos" : "Adicionar aos Favoritos"}
+              >
+                <Heart className={`h-6 w-6 transition-all ${isFav ? 'fill-rose-500 text-rose-500 scale-110' : 'text-slate-400 group-hover:text-rose-500 scale-100 group-hover:scale-105'}`} />
               </Button>
                  </div>
+            {isOutOfStockSelection && (
+              <p className="text-xs text-rose-500 font-semibold leading-none">
+                * Este produto ou combinação não possui estoque disponível no momento.
+              </p>
+            )}
                  {shippingOptions.length > 0 && (
                    <div className="space-y-2 pt-2 border-t text-left">
                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Opções de Frete:</p>

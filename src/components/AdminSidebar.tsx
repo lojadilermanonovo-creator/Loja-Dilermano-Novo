@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, FolderTree, ClipboardList, LogOut, Package, 
@@ -6,7 +6,8 @@ import {
   Sparkles, ChevronLeft, ChevronRight, User 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { auth } from '@/src/integrations/firebase/client';
+import { auth, db } from '@/src/integrations/firebase/client';
+import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { toast } from 'sonner';
 
@@ -17,6 +18,24 @@ interface AdminSidebarProps {
 export default function AdminSidebar({ onClose }: AdminSidebarProps) {
   const location = useLocation();
   const adminEmail = auth.currentUser?.email || 'lojadilermanonovo@gmail.com';
+  const [adminBrandName, setAdminBrandName] = useState('Dilermando');
+
+  useEffect(() => {
+    const fetchBrandName = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'general'));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.adminBrandName) {
+            setAdminBrandName(data.adminBrandName);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching admin brand name:', err);
+      }
+    };
+    fetchBrandName();
+  }, []);
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     return localStorage.getItem('admin_sidebar_collapsed') === 'true';
@@ -80,7 +99,7 @@ export default function AdminSidebar({ onClose }: AdminSidebarProps) {
               <span className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-lg shadow-indigo-505/20 text-white">
                 <Sparkles className="h-4.5 w-4.5" />
               </span>
-              Dilermando
+              {adminBrandName}
             </h2>
             <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest block mt-1 ml-0.5">ADMIN PANEL</span>
           </div>

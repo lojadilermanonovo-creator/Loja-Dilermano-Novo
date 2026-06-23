@@ -127,6 +127,11 @@ export default function AdminOrders() {
   };
 
   const updateStatus = async (orderId: string, newStatus: string) => {
+    if (newStatus === 'paid') {
+      await updatePaymentStatus(orderId, true);
+      return;
+    }
+
     try {
       if (newStatus === 'cancelled') {
         await restoreStock(orderId);

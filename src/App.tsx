@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/src/contexts/AuthContext';
 import { CartProvider } from '@/src/contexts/CartContext';
 import { DatabaseStatusProvider } from '@/src/contexts/DatabaseStatusContext';
+import { WishlistProvider } from '@/src/contexts/WishlistContext';
 import { Toaster } from 'sonner';
 
 // Pages
@@ -10,6 +11,7 @@ import Index from '@/src/pages/Index';
 import AdminInit from '@/src/pages/AdminInit';
 import CategoryPage from '@/src/pages/CategoryPage';
 import ProductPage from '@/src/pages/ProductPage';
+import FavoritesPage from '@/src/pages/Favorites';
 import CartPage from '@/src/pages/CartPage';
 import CheckoutPage from '@/src/pages/CheckoutPage';
 import CheckoutSuccess from '@/src/pages/CheckoutSuccess';
@@ -64,8 +66,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <DatabaseStatusProvider>
-          <CartProvider>
-            <Router>
+          <WishlistProvider>
+            <CartProvider>
+              <Router>
               <ScrollToTop />
               <Routes>
                 {/* Store Routes */}
@@ -74,6 +77,7 @@ export default function App() {
                   <Route path="/initialize-admin" element={<AdminInit />} />
                   <Route path="/categoria/:id" element={<CategoryPage />} />
                   <Route path="/produto/:id" element={<ProductPage />} />
+                  <Route path="/favoritos" element={<FavoritesPage />} />
                   <Route path="/carrinho" element={<CartPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/checkout/success" element={<CheckoutSuccess />} />
@@ -122,6 +126,7 @@ export default function App() {
               <Toaster position="top-right" richColors />
             </Router>
           </CartProvider>
+          </WishlistProvider>
         </DatabaseStatusProvider>
       </AuthProvider>
     </QueryClientProvider>

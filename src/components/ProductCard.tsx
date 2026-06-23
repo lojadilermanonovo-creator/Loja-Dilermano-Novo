@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, Eye } from 'lucide-react';
+import { ShoppingCart, Eye, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/src/contexts/CartContext';
+import { useWishlist } from '@/src/contexts/WishlistContext';
 import { toast } from 'sonner';
 
 export interface ProductCardProps {
@@ -20,8 +21,22 @@ export interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addItem } = useCart();
+  const { isFavorited, toggleFavorite } = useWishlist();
   const imageUrl = product.images?.[0]?.url || "https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=2070&auto=format&fit=crop";
   const hasDiscount = product.originalPrice && product.originalPrice > product.price;
+
+  const isFav = isFavorited(product.id);
+
+  const handleToggleFavorite = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFavorite({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      images: product.images || [{ url: imageUrl }]
+    });
+  };
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -37,12 +52,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   return (
     <div className="group relative flex flex-col gap-3">
-      <Link to={`/produto/${product.id}`} className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-surface-elevated">
-        <img 
-          src={imageUrl} 
-          alt={product.name}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-        />
+      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-surface-elevated">
+        <Link to={`/produto/${product.id}`} className="block h-full w-full">
+          <img 
+            src={imageUrl} 
+            alt={product.name}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+          />
+        </Link>
+        
+        <button 
+          className="absolute top-3 right-3 z-10 p-2.5 rounded-full bg-white/90 hover:bg-white text-slate-800 hover:text-rose-500 shadow-md transition-all duration-300 hover:scale-105"
+          onClick={handleToggleFavorite}
+          title="Favoritar"
+        >
+          <Heart className={`h-4 w-4 transition-all ${isFav ? 'fill-rose-500 text-rose-500 scale-110' : 'text-slate-700'}`} />
+        </button>
         
         <div className="absolute top-3 left-3 flex flex-col gap-2">
           {product.isNew && (
@@ -63,7 +88,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             <ShoppingCart className="h-4 w-4" />
           </Button>
         </div>
-      </Link>
+      </div>
 
       <div className="flex flex-col gap-1">
         <Link to={`/produto/${product.id}`} className="text-sm font-medium hover:text-ocean transition-colors line-clamp-2">

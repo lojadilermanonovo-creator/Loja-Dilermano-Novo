@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db } from '@/src/integrations/firebase/client';
 import { doc, getDoc } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 export interface CartItem {
   productId: string;
@@ -24,9 +25,9 @@ export interface AppliedCoupon {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: CartItem) => void;
+  addItem: (item: CartItem) => Promise<boolean>;
   removeItem: (productId: string, variantId?: string) => void;
-  updateQuantity: (productId: string, quantity: number, variantId?: string) => void;
+  updateQuantity: (productId: string, quantity: number, variantId?: string) => Promise<void>;
   clearCart: () => void;
   subtotal: number;
   totalItems: number;
@@ -64,36 +65,128 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [appliedCoupon]);
 
-  const addItem = (newItem: CartItem) => {
-    setItems((prev) => {
-      const existing = prev.find(
+  const addItem = async (newItem: CartItem) => {
+    try {
+      const pDoc = await getDoc(doc(db, 'products', newItem.productId));
+      if (!pDoc.exists()) {
+        toast.error('Produto não encontrado.');
+        return false;
+      }
+      
+      const pData = pDoc.data();
+      let maxStock = Number(pData.stockQuantity) || 0;
+
+      if (pData.variations && pData.variations.length > 0 && newItem.attributes) {
+        const sizeAttr = newItem.attributes['Tamanho'] || newItem.attributes['size'] || '';
+        const colorAttr = newItem.attributes['Cor'] || newItem.attributes['color'] || '';
+        
+        const matchingVar = pData.variations.find((v: any) => 
+          (v.size || '').toLowerCase() === sizeAttr.toLowerCase() &&
+          (v.color || '').toLowerCase() === colorAttr.toLowerCase()
+        );
+        maxStock = matchingVar ? (Number(matchingVar.stockQuantity) || 0) : 0;
+      }
+
+      const existing = items.find(
         (i) => i.productId === newItem.productId && i.variantId === newItem.variantId
       );
-      if (existing) {
-        return prev.map((i) =>
-          i.productId === newItem.productId && i.variantId === newItem.variantId
-            ? { ...i, quantity: i.quantity + newItem.quantity }
-            : i
-        );
+      const currentCartQty = existing ? existing.quantity : 0;
+      const targetQty = currentCartQty + newItem.quantity;
+
+      if (targetQty > maxStock) {
+        toast.error('Quantidade solicitada maior que o estoque disponível.');
+        const possibleToAdd = maxStock - currentCartQty;
+        if (possibleToAdd > 0) {
+          setItems((prev) =>
+            prev.map((i) =>
+              i.productId === newItem.productId && i.variantId === newItem.variantId
+                ? { ...i, quantity: maxStock }
+                : i
+            )
+          );
+        }
+        return false;
       }
-      return [...prev, newItem];
-    });
+
+      setItems((prev) => {
+        if (existing) {
+          return prev.map((i) =>
+            i.productId === newItem.productId && i.variantId === newItem.variantId
+              ? { ...i, quantity: i.quantity + newItem.quantity }
+              : i
+          );
+        }
+        return [...prev, newItem];
+      });
+
+      toast.success(`${newItem.name} adicionado ao carrinho!`);
+      return true;
+    } catch (err) {
+      console.error('Error adding item to cart:', err);
+      return false;
+    }
   };
 
   const removeItem = (productId: string, variantId?: string) => {
     setItems((prev) => prev.filter((i) => !(i.productId === productId && i.variantId === variantId)));
   };
 
-  const updateQuantity = (productId: string, quantity: number, variantId?: string) => {
+  const updateQuantity = async (productId: string, quantity: number, variantId?: string) => {
     if (quantity <= 0) {
       removeItem(productId, variantId);
       return;
     }
-    setItems((prev) =>
-      prev.map((i) =>
-        i.productId === productId && i.variantId === variantId ? { ...i, quantity } : i
-      )
-    );
+
+    try {
+      const pDoc = await getDoc(doc(db, 'products', productId));
+      if (!pDoc.exists()) {
+        toast.error('Produto não encontrado.');
+        return;
+      }
+      
+      const pData = pDoc.data();
+      let maxStock = Number(pData.stockQuantity) || 0;
+
+      const existing = items.find((i) => i.productId === productId && i.variantId === variantId);
+
+      if (pData.variations && pData.variations.length > 0 && existing?.attributes) {
+        const sizeAttr = existing.attributes['Tamanho'] || '';
+        const colorAttr = existing.attributes['Cor'] || '';
+        
+        const matchingVar = pData.variations.find((v: any) => 
+          (v.size || '').toLowerCase() === sizeAttr.toLowerCase() &&
+          (v.color || '').toLowerCase() === colorAttr.toLowerCase()
+        );
+        maxStock = matchingVar ? (Number(matchingVar.stockQuantity) || 0) : 0;
+      }
+
+      if (quantity > maxStock) {
+        toast.error('Quantidade solicitada maior que o estoque disponível.');
+        if (maxStock > 0) {
+          setItems((prev) =>
+            prev.map((i) =>
+              i.productId === productId && i.variantId === variantId ? { ...i, quantity: maxStock } : i
+            )
+          );
+        } else {
+          removeItem(productId, variantId);
+        }
+        return;
+      }
+
+      setItems((prev) =>
+        prev.map((i) =>
+          i.productId === productId && i.variantId === variantId ? { ...i, quantity } : i
+        )
+      );
+    } catch (err) {
+      console.error('Error updating quantity:', err);
+      setItems((prev) =>
+        prev.map((i) =>
+          i.productId === productId && i.variantId === variantId ? { ...i, quantity } : i
+        )
+      );
+    }
   };
 
   const clearCart = () => {

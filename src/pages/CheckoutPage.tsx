@@ -95,6 +95,46 @@ export default function CheckoutPage() {
 
     setLoading(true);
     try {
+      // Validate all items against Firestore stock
+      for (const item of items) {
+        const productRef = doc(db, 'products', item.productId);
+        const productSnap = await getDoc(productRef);
+        
+        if (!productSnap.exists()) {
+          throw new Error(`O produto "${item.name}" não foi encontrado em nosso catálogo.`);
+        }
+        
+        const productData = productSnap.data();
+        
+        if (productData.isActive === false) {
+          throw new Error(`O produto "${item.name}" está indisponível para compra no momento.`);
+        }
+
+        let availableStock = Number(productData.stockQuantity) || 0;
+        let itemAttrString = '';
+
+        if (productData.variations && productData.variations.length > 0 && item.attributes) {
+          const sizeAttr = item.attributes['Tamanho'] || '';
+          const colorAttr = item.attributes['Cor'] || '';
+          itemAttrString = ` (${sizeAttr}${sizeAttr && colorAttr ? ' - ' : ''}${colorAttr})`;
+          
+          const matchingVar = productData.variations.find((v: any) => 
+            (v.size || '').toLowerCase() === sizeAttr.toLowerCase() &&
+            (v.color || '').toLowerCase() === colorAttr.toLowerCase()
+          );
+          
+          availableStock = matchingVar ? (Number(matchingVar.stockQuantity) || 0) : 0;
+        }
+
+        if (item.quantity > availableStock) {
+          if (availableStock <= 0) {
+            throw new Error(`O produto "${item.name}"${itemAttrString} está esgotado.`);
+          } else {
+            throw new Error(`O produto "${item.name}"${itemAttrString} possui apenas ${availableStock} un. disponíveis em estoque, mas você possui ${item.quantity} no carrinho.`);
+          }
+        }
+      }
+
       const shippingCost = selectedShippingOption ? selectedShippingOption.price : 0;
       const totalAmount = Math.max(subtotal - discountAmount, 0) + shippingCost;
 

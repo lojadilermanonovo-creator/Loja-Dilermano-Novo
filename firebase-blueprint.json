@@ -97,6 +97,19 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "WishlistItem": {
+      "title": "WishlistItem",
+      "description": "An item in the user's wishlist",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["productId", "name", "price"]
     }
   },
   "firestore": {
@@ -107,6 +120,7 @@
     "orders/{id}": { "schema": "Order", "description": "Customer orders" },
     "coupons/{id}": { "schema": "object", "description": "Discount coupons" },
     "banners/{id}": { "schema": "object", "description": "Home banners" },
-    "promoBanner/config": { "schema": "object", "description": "Global config" }
+    "promoBanner/config": { "schema": "object", "description": "Global config" },
+    "wishlists/{uid}/items/{productId}": { "schema": "WishlistItem", "description": "User wishlist items" }
   }
 }

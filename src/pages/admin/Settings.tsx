@@ -27,6 +27,7 @@ export default function AdminSettings() {
 
   // States for general config
   const [storeName, setStoreName] = useState('Dilermano Store');
+  const [adminBrandName, setAdminBrandName] = useState('Dilermando');
   const [whatsapp, setWhatsapp] = useState('');
   const [pixKey, setPixKey] = useState('');
   const [pixQrCodeUrl, setPixQrCodeUrl] = useState('');
@@ -90,6 +91,7 @@ export default function AdminSettings() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setStoreName(data.storeName || 'Dilermano Store');
+        setAdminBrandName(data.adminBrandName || 'Dilermando');
         setWhatsapp(data.whatsapp || '');
         setPixKey(data.pixKey || '');
         setPixQrCodeUrl(data.pixQrCodeUrl || '');
@@ -97,6 +99,7 @@ export default function AdminSettings() {
       } else {
         await setDoc(doc(db, 'settings', 'general'), {
           storeName: 'Dilermano Store',
+          adminBrandName: 'Dilermando',
           whatsapp: '',
           pixKey: '',
           pixQrCodeUrl: '',
@@ -201,6 +204,7 @@ export default function AdminSettings() {
     try {
       await setDoc(doc(db, 'settings', 'general'), {
         storeName,
+        adminBrandName,
         whatsapp,
         pixKey,
         pixQrCodeUrl,
@@ -541,7 +545,7 @@ export default function AdminSettings() {
                     Nome fantasia de sua marca nos cabeçalhos e correspondências.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-6 space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="pref-storeName" className="text-xs font-semibold text-slate-700">Nome Fantasia da Loja</Label>
                     <Input 
@@ -549,6 +553,17 @@ export default function AdminSettings() {
                       value={storeName} 
                       onChange={(e) => setStoreName(e.target.value)}
                       className="rounded-xl border-slate-200 h-10 bg-white" 
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="pref-adminBrandName" className="text-xs font-semibold text-slate-700">Nome da Empresa (Painel Administrativo)</Label>
+                    <Input 
+                      id="pref-adminBrandName" 
+                      value={adminBrandName} 
+                      onChange={(e) => setAdminBrandName(e.target.value)}
+                      className="rounded-xl border-slate-200 h-10 bg-white" 
+                      placeholder="Dilermando"
                     />
                   </div>
                 </CardContent>

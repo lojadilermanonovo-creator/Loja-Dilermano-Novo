@@ -1,4 +1,4 @@
-import { ShoppingCart, User, Menu, Search, X } from 'lucide-react';
+import { ShoppingCart, User, Menu, Search, X, Heart } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '@/src/contexts/CartContext';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -29,6 +29,10 @@ export default function Header() {
                 <Link to="/categoria/promocoes" className="text-lg">Promoções</Link>
                 <Link to="/categoria/masculino" className="text-lg">Masculino</Link>
                 <Link to="/categoria/feminino" className="text-lg">Feminino</Link>
+                <Link to="/favoritos" className="text-lg flex items-center gap-2 text-rose-600 font-bold">
+                  <Heart className="h-5 w-5 fill-rose-500 text-rose-500" />
+                  Meus Favoritos
+                </Link>
                 {isAdmin && (
                    <Link to="/admin" className="text-lg font-bold text-ocean">Painel Admin</Link>
                 )}
@@ -56,6 +60,11 @@ export default function Header() {
           <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(!isSearchOpen)}>
             <Search className="h-5 w-5" />
           </Button>
+
+          <Link to="/favoritos" className="flex items-center gap-1 bg-transparent hover:bg-slate-50 transition-colors py-1.5 px-3 rounded-xl text-slate-700 hover:text-rose-600 ring-offset-background focus-visible:outline-none">
+            <Heart className="h-5 w-5 text-rose-500 hover:scale-110 transition-all" />
+            <span className="hidden lg:inline text-xs font-bold leading-none">Meus Favoritos</span>
+          </Link>
 
           <Link to={user ? "/conta" : "/login"}>
             <Button variant="ghost" size="icon">
