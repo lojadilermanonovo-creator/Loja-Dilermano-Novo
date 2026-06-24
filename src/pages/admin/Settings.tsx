@@ -80,6 +80,12 @@ export default function AdminSettings() {
   const [popupButtonDestination, setPopupButtonDestination] = useState('');
   const [popupDelaySeconds, setPopupDelaySeconds] = useState<number>(5);
   const [popupOncePerVisitor, setPopupOncePerVisitor] = useState(true);
+  const [popupLayout, setPopupLayout] = useState<'horizontal' | 'vertical'>('horizontal');
+  const [popupBgColor, setPopupBgColor] = useState('#FFFFFF');
+  const [popupTitleColor, setPopupTitleColor] = useState('#0F172A');
+  const [popupTextColor, setPopupTextColor] = useState('#475569');
+  const [popupBtnBgColor, setPopupBtnBgColor] = useState('#2563EB');
+  const [popupBtnTextColor, setPopupBtnTextColor] = useState('#FFFFFF');
 
   // States for Melhor Envio
   const [meClientId, setMeClientId] = useState('');
@@ -213,6 +219,12 @@ export default function AdminSettings() {
         setPopupButtonDestination(data.buttonDestination || '');
         setPopupDelaySeconds(data.delaySeconds !== undefined ? Number(data.delaySeconds) : 5);
         setPopupOncePerVisitor(data.oncePerVisitor !== undefined ? data.oncePerVisitor : true);
+        setPopupLayout(data.layout || 'horizontal');
+        setPopupBgColor(data.bgColor || '#FFFFFF');
+        setPopupTitleColor(data.titleColor || '#0F172A');
+        setPopupTextColor(data.textColor || '#475569');
+        setPopupBtnBgColor(data.btnBgColor || '#2563EB');
+        setPopupBtnTextColor(data.btnTextColor || '#FFFFFF');
       } else {
         setPopupActive(false);
         setPopupTitle('Novidades & Ofertas');
@@ -223,6 +235,12 @@ export default function AdminSettings() {
         setPopupButtonDestination('');
         setPopupDelaySeconds(5);
         setPopupOncePerVisitor(true);
+        setPopupLayout('horizontal');
+        setPopupBgColor('#FFFFFF');
+        setPopupTitleColor('#0F172A');
+        setPopupTextColor('#475569');
+        setPopupBtnBgColor('#2563EB');
+        setPopupBtnTextColor('#FFFFFF');
       }
     } catch (e) {
       console.error(e);
@@ -304,6 +322,12 @@ export default function AdminSettings() {
         buttonDestination: popupButtonDestination,
         delaySeconds: Number(popupDelaySeconds) || 5,
         oncePerVisitor: popupOncePerVisitor,
+        layout: popupLayout,
+        bgColor: popupBgColor,
+        titleColor: popupTitleColor,
+        textColor: popupTextColor,
+        btnBgColor: popupBtnBgColor,
+        btnTextColor: popupBtnTextColor,
         updatedAt: serverTimestamp(),
       });
       toast.success('Configurações do Popup salvas com sucesso!');
@@ -325,6 +349,12 @@ export default function AdminSettings() {
     setPopupButtonDestination('');
     setPopupDelaySeconds(5);
     setPopupOncePerVisitor(true);
+    setPopupLayout('horizontal');
+    setPopupBgColor('#FFFFFF');
+    setPopupTitleColor('#0F172A');
+    setPopupTextColor('#475569');
+    setPopupBtnBgColor('#2563EB');
+    setPopupBtnTextColor('#FFFFFF');
     toast.info('Valores padrão do popup preenchidos. Clique em "Salvar Alterações" para gravar.');
   };
 
@@ -774,7 +804,7 @@ export default function AdminSettings() {
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Title */}
                     <div className="space-y-1.5">
                       <Label htmlFor="popup-title" className="text-xs font-semibold text-slate-700">Título do Popup *</Label>
@@ -788,9 +818,23 @@ export default function AdminSettings() {
                       />
                     </div>
 
+                    {/* Layout Option */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="popup-layout" className="text-xs font-semibold text-slate-700">Modelo do Layout *</Label>
+                      <select
+                        id="popup-layout"
+                        value={popupLayout}
+                        onChange={(e) => setPopupLayout(e.target.value as 'horizontal' | 'vertical')}
+                        className="w-full rounded-xl border border-slate-200 h-10 px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                      >
+                        <option value="horizontal">Horizontal (atual)</option>
+                        <option value="vertical">Vertical</option>
+                      </select>
+                    </div>
+
                     {/* Delay Option */}
                     <div className="space-y-1.5">
-                      <Label htmlFor="popup-delay" className="text-xs font-semibold text-slate-700">Tempo de Espera para Aparecer (segundos)</Label>
+                      <Label htmlFor="popup-delay" className="text-xs font-semibold text-slate-700">Espera para Aparecer (segundos)</Label>
                       <Input 
                         id="popup-delay" 
                         type="number" 
@@ -896,6 +940,119 @@ export default function AdminSettings() {
                     </label>
                   </div>
 
+                  {/* Colors Customization */}
+                  <div className="pt-4 border-t border-slate-100 space-y-3">
+                    <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1">
+                      <Palette className="h-3.5 w-3.5 text-blue-500" /> Personalização de Cores do Popup
+                    </h5>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      {/* BG Color */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="popup-bgcolor" className="text-[10px] font-semibold text-slate-500">Cor de Fundo</Label>
+                        <div className="flex gap-1.5">
+                          <input 
+                            id="popup-bgcolor" 
+                            type="color" 
+                            value={popupBgColor} 
+                            onChange={(e) => setPopupBgColor(e.target.value)}
+                            className="w-8 h-8 border border-slate-200 rounded-lg cursor-pointer bg-transparent p-0 shrink-0" 
+                          />
+                          <Input 
+                            id="popup-bgcolor-hex" 
+                            value={popupBgColor} 
+                            onChange={(e) => setPopupBgColor(e.target.value)}
+                            className="rounded-lg border-slate-200 h-8 bg-white font-mono uppercase text-xs p-1" 
+                            maxLength={7}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Title Color */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="popup-titlecolor" className="text-[10px] font-semibold text-slate-500">Cor do Título</Label>
+                        <div className="flex gap-1.5">
+                          <input 
+                            id="popup-titlecolor" 
+                            type="color" 
+                            value={popupTitleColor} 
+                            onChange={(e) => setPopupTitleColor(e.target.value)}
+                            className="w-8 h-8 border border-slate-200 rounded-lg cursor-pointer bg-transparent p-0 shrink-0" 
+                          />
+                          <Input 
+                            id="popup-titlecolor-hex" 
+                            value={popupTitleColor} 
+                            onChange={(e) => setPopupTitleColor(e.target.value)}
+                            className="rounded-lg border-slate-200 h-8 bg-white font-mono uppercase text-xs p-1" 
+                            maxLength={7}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Text Color */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="popup-textcolor" className="text-[10px] font-semibold text-slate-500">Cor do Texto</Label>
+                        <div className="flex gap-1.5">
+                          <input 
+                            id="popup-textcolor" 
+                            type="color" 
+                            value={popupTextColor} 
+                            onChange={(e) => setPopupTextColor(e.target.value)}
+                            className="w-8 h-8 border border-slate-200 rounded-lg cursor-pointer bg-transparent p-0 shrink-0" 
+                          />
+                          <Input 
+                            id="popup-textcolor-hex" 
+                            value={popupTextColor} 
+                            onChange={(e) => setPopupTextColor(e.target.value)}
+                            className="rounded-lg border-slate-200 h-8 bg-white font-mono uppercase text-xs p-1" 
+                            maxLength={7}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Button BG Color */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="popup-btnbgcolor" className="text-[10px] font-semibold text-slate-500">Fundo do Botão</Label>
+                        <div className="flex gap-1.5">
+                          <input 
+                            id="popup-btnbgcolor" 
+                            type="color" 
+                            value={popupBtnBgColor} 
+                            onChange={(e) => setPopupBtnBgColor(e.target.value)}
+                            className="w-8 h-8 border border-slate-200 rounded-lg cursor-pointer bg-transparent p-0 shrink-0" 
+                          />
+                          <Input 
+                            id="popup-btnbgcolor-hex" 
+                            value={popupBtnBgColor} 
+                            onChange={(e) => setPopupBtnBgColor(e.target.value)}
+                            className="rounded-lg border-slate-200 h-8 bg-white font-mono uppercase text-xs p-1" 
+                            maxLength={7}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Button Text Color */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor="popup-btntextcolor" className="text-[10px] font-semibold text-slate-500">Texto do Botão</Label>
+                        <div className="flex gap-1.5">
+                          <input 
+                            id="popup-btntextcolor" 
+                            type="color" 
+                            value={popupBtnTextColor} 
+                            onChange={(e) => setPopupBtnTextColor(e.target.value)}
+                            className="w-8 h-8 border border-slate-200 rounded-lg cursor-pointer bg-transparent p-0 shrink-0" 
+                          />
+                          <Input 
+                            id="popup-btntextcolor-hex" 
+                            value={popupBtnTextColor} 
+                            onChange={(e) => setPopupBtnTextColor(e.target.value)}
+                            className="rounded-lg border-slate-200 h-8 bg-white font-mono uppercase text-xs p-1" 
+                            maxLength={7}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Live Preview Section */}
                   <div className="border border-dashed border-slate-300 rounded-3xl p-4 bg-slate-50/50 mt-4">
                     <p className="text-xs uppercase font-extrabold tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
@@ -904,13 +1061,20 @@ export default function AdminSettings() {
                     
                     {popupActive ? (
                       <div className="flex items-center justify-center bg-slate-800/20 p-6 rounded-2xl border border-slate-200/50 min-h-[300px]">
-                        <div className="bg-white rounded-2xl overflow-hidden shadow-xl max-w-lg w-full flex flex-col sm:flex-row border border-slate-100 relative">
-                          <button disabled className="absolute top-3 right-3 bg-slate-100 text-slate-700 rounded-full p-1.5 opacity-80 cursor-not-allowed">
+                        <div 
+                          className={`rounded-2xl overflow-hidden shadow-xl w-full border border-slate-100 relative ${
+                            popupLayout === 'vertical' ? 'max-w-xs flex flex-col' : 'max-w-lg flex flex-col sm:flex-row'
+                          }`}
+                          style={{ backgroundColor: popupBgColor }}
+                        >
+                          <button disabled className="absolute top-3 right-3 bg-slate-150 text-slate-700 rounded-full p-1.5 opacity-80 cursor-not-allowed z-20">
                             <X className="h-3 w-3" />
                           </button>
                           
                           {popupImageUrl ? (
-                            <div className="sm:w-2/5 h-28 sm:h-auto relative bg-slate-50 shrink-0">
+                            <div className={`${
+                              popupLayout === 'vertical' ? 'w-full h-36' : 'sm:w-2/5 h-28 sm:h-auto'
+                            } relative bg-slate-50 shrink-0 z-10`}>
                               <img 
                                 src={popupImageUrl} 
                                 alt="Preview" 
@@ -918,29 +1082,44 @@ export default function AdminSettings() {
                               />
                             </div>
                           ) : (
-                            <div className="hidden sm:flex sm:w-1/3 bg-slate-50 items-center justify-center border-r border-slate-100 shrink-0 p-4">
+                            <div className={`${
+                              popupLayout === 'vertical' ? 'w-full h-20 border-b' : 'hidden sm:flex sm:w-1/3 border-r'
+                            } bg-slate-50/50 items-center justify-center border-slate-100 shrink-0 p-4 z-10`}>
                               <div className="text-center space-y-1 text-blue-500">
-                                <Sparkles className="h-8 w-8 mx-auto" />
+                                <Sparkles className="h-6 w-6 mx-auto animate-pulse" />
                               </div>
                             </div>
                           )}
                           
-                          <div className="flex-1 p-6 flex flex-col justify-center space-y-4 text-left">
+                          <div className="flex-1 p-6 flex flex-col justify-center space-y-4 text-left z-10">
                             <div className="space-y-1.5">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-extrabold uppercase tracking-wider">
-                                <Sparkles className="h-2.5 w-2.5" /> Cupom Ativo
+                              <span 
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider"
+                                style={{ backgroundColor: `${popupBtnBgColor}15`, color: popupBtnBgColor }}
+                              >
+                                <Sparkles className="h-2.5 w-2.5" /> Ativo
                               </span>
-                              <h4 className="text-lg font-black text-slate-900 tracking-tight leading-none uppercase">
+                              <h4 
+                                className="text-base font-black tracking-tight leading-none uppercase"
+                                style={{ color: popupTitleColor }}
+                              >
                                 {popupTitle || 'Sem Título'}
                               </h4>
                               {popupText && (
-                                <p className="text-slate-500 text-xs font-semibold leading-relaxed whitespace-pre-line">
+                                <p 
+                                  className="text-xs font-semibold leading-relaxed whitespace-pre-line"
+                                  style={{ color: popupTextColor }}
+                                >
                                   {popupText}
                                 </p>
                               )}
                             </div>
                             
-                            <button disabled className="w-full bg-blue-600 text-white font-black text-xs uppercase py-3 px-4 rounded-xl shadow-md cursor-not-allowed text-center">
+                            <button 
+                              disabled 
+                              className="w-full font-black text-xs uppercase py-2.5 px-4 rounded-xl shadow-md cursor-not-allowed text-center transition-all"
+                              style={{ backgroundColor: popupBtnBgColor, color: popupBtnTextColor }}
+                            >
                               {popupButtonText || 'Garantir Benefício'}
                             </button>
                           </div>
