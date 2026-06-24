@@ -45,6 +45,7 @@ import Footer from '@/src/components/Footer';
 import WhatsAppButton from '@/src/components/WhatsAppButton';
 import ProtectedRoute from '@/src/components/ProtectedRoute';
 import ScrollToTop from '@/src/components/ScrollToTop';
+import PromoPopup from '@/src/components/PromoPopup';
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ function StoreLayout() {
       </main>
       <Footer />
       <WhatsAppButton />
+      <PromoPopup />
     </div>
   );
 }

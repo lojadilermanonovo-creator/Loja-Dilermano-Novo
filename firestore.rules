@@ -84,7 +84,7 @@ service cloud.firestore {
     }
 
     match /settings/{id} {
-      allow read: if id == 'general' || id == 'promocta' || isAdmin();
+      allow read: if id == 'general' || id == 'promocta' || id == 'footer' || id == 'popup' || isAdmin();
       allow write: if isAdmin();
     }
   }

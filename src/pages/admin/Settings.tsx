@@ -10,7 +10,8 @@ import { toast } from 'sonner';
 import { 
   Settings, Save, Phone, QrCode, MapPin, Store, 
   Globe, Key, RefreshCw, AlertCircle, CheckCircle2, Truck,
-  Megaphone, Palette, Trash2, AlertTriangle, Download
+  Megaphone, Palette, Trash2, AlertTriangle, Download,
+  MessageSquare, Mail, Link2, Clock, Sparkles, Eye, X
 } from 'lucide-react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import ImageUploader from '@/src/components/admin/ImageUploader';
@@ -23,7 +24,7 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'melhorenvio' | 'promocta' | 'footer'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'melhorenvio' | 'popup' | 'footer'>('general');
 
   // States for general config
   const [storeName, setStoreName] = useState('Dilermano Store');
@@ -68,6 +69,17 @@ export default function AdminSettings() {
   const [ctaButtonLink, setCtaButtonLink] = useState('/categoria/promocoes');
   const [ctaBgColor, setCtaBgColor] = useState('#2563EB');
   const [ctaTextColor, setCtaTextColor] = useState('#FFFFFF');
+
+  // States for Popup
+  const [popupActive, setPopupActive] = useState(false);
+  const [popupTitle, setPopupTitle] = useState('Novidades & Ofertas');
+  const [popupText, setPopupText] = useState('Inscreva-se em nossa newsletter ou entre em contato para receber cupons exclusivos!');
+  const [popupImageUrl, setPopupImageUrl] = useState('');
+  const [popupButtonText, setPopupButtonText] = useState('Falar no WhatsApp');
+  const [popupButtonAction, setPopupButtonAction] = useState<'whatsapp' | 'email' | 'link'>('whatsapp');
+  const [popupButtonDestination, setPopupButtonDestination] = useState('');
+  const [popupDelaySeconds, setPopupDelaySeconds] = useState<number>(5);
+  const [popupOncePerVisitor, setPopupOncePerVisitor] = useState(true);
 
   // States for Melhor Envio
   const [meClientId, setMeClientId] = useState('');
@@ -187,6 +199,31 @@ export default function AdminSettings() {
         setCtaBgColor('#2563EB');
         setCtaTextColor('#FFFFFF');
       }
+
+      // 5. Popup Settings
+      const popupSnap = await getDoc(doc(db, 'settings', 'popup'));
+      if (popupSnap.exists()) {
+        const data = popupSnap.data();
+        setPopupActive(data.active !== undefined ? data.active : false);
+        setPopupTitle(data.title || 'Novidades & Ofertas');
+        setPopupText(data.text || '');
+        setPopupImageUrl(data.imageUrl || '');
+        setPopupButtonText(data.buttonText || 'Falar no WhatsApp');
+        setPopupButtonAction(data.buttonAction || 'whatsapp');
+        setPopupButtonDestination(data.buttonDestination || '');
+        setPopupDelaySeconds(data.delaySeconds !== undefined ? Number(data.delaySeconds) : 5);
+        setPopupOncePerVisitor(data.oncePerVisitor !== undefined ? data.oncePerVisitor : true);
+      } else {
+        setPopupActive(false);
+        setPopupTitle('Novidades & Ofertas');
+        setPopupText('Inscreva-se em nossa newsletter ou entre em contato para receber cupons exclusivos!');
+        setPopupImageUrl('');
+        setPopupButtonText('Falar no WhatsApp');
+        setPopupButtonAction('whatsapp');
+        setPopupButtonDestination('');
+        setPopupDelaySeconds(5);
+        setPopupOncePerVisitor(true);
+      }
     } catch (e) {
       console.error(e);
       toast.error('Erro ao buscar as configurações do sistema');
@@ -254,41 +291,41 @@ export default function AdminSettings() {
     }
   };
 
-  const handleSavePromoCTA = async () => {
+  const handleSavePopup = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'settings', 'promocta'), {
-        active: ctaActive,
-        title: ctaTitle,
-        subtitle: ctaSubtitle,
-        value: ctaValue === '' ? '' : Number(ctaValue),
-        installments: ctaInstallments === '' ? '' : Number(ctaInstallments),
-        buttonText: ctaButtonText,
-        buttonLink: ctaButtonLink,
-        bgColor: ctaBgColor,
-        textColor: ctaTextColor,
+      await setDoc(doc(db, 'settings', 'popup'), {
+        active: popupActive,
+        title: popupTitle,
+        text: popupText,
+        imageUrl: popupImageUrl,
+        buttonText: popupButtonText,
+        buttonAction: popupButtonAction,
+        buttonDestination: popupButtonDestination,
+        delaySeconds: Number(popupDelaySeconds) || 5,
+        oncePerVisitor: popupOncePerVisitor,
         updatedAt: serverTimestamp(),
       });
-      toast.success('Configurações do Banner Promocional atualizadas com sucesso!');
+      toast.success('Configurações do Popup salvas com sucesso!');
     } catch (e) {
       console.error(e);
-      toast.error('Erro ao salvar as configurações do Banner Promocional');
+      toast.error('Erro ao salvar as configurações do Popup');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleRestorePromoDefaults = () => {
-    setCtaActive(true);
-    setCtaTitle('Frete Grátis acima de R$ {valor}');
-    setCtaSubtitle('Aproveite para renovar seu guarda-roupa sem se preocupar com a entrega. Parcele em até {parcelas} sem juros.');
-    setCtaValue(299);
-    setCtaInstallments(5);
-    setCtaButtonText('Aproveitar Agora');
-    setCtaButtonLink('/categoria/promocoes');
-    setCtaBgColor('#2563EB');
-    setCtaTextColor('#FFFFFF');
-    toast.info('Valores padrão preenchidos. Clique em "Salvar Alterações" para gravar.');
+  const handleRestorePopupDefaults = () => {
+    setPopupActive(false);
+    setPopupTitle('Novidades & Ofertas');
+    setPopupText('Inscreva-se em nossa newsletter ou entre em contato para receber cupons exclusivos!');
+    setPopupImageUrl('');
+    setPopupButtonText('Falar no WhatsApp');
+    setPopupButtonAction('whatsapp');
+    setPopupButtonDestination('');
+    setPopupDelaySeconds(5);
+    setPopupOncePerVisitor(true);
+    toast.info('Valores padrão do popup preenchidos. Clique em "Salvar Alterações" para gravar.');
   };
 
   const handleSaveMelhorEnvio = async () => {
@@ -495,14 +532,14 @@ export default function AdminSettings() {
           Configurações Gerais
         </button>
         <button
-          onClick={() => setActiveTab('promocta')}
+          onClick={() => setActiveTab('popup')}
           className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
-            activeTab === 'promocta'
+            activeTab === 'popup'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-400 hover:text-slate-600'
           }`}
         >
-          Banner Promocional (CTA)
+          Popup's
         </button>
         <button
           onClick={() => setActiveTab('melhorenvio')}
@@ -709,16 +746,16 @@ export default function AdminSettings() {
             </div>
           )}
 
-          {activeTab === 'promocta' && (
+          {activeTab === 'popup' && (
             <div className="space-y-6">
-              {/* Card Banner Promocional CTA */}
+              {/* Card Popup Settings */}
               <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <CardHeader className="bg-slate-50 border-b p-6">
                   <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <Megaphone className="h-4.5 w-4.5 text-blue-500" /> Banner Promocional (CTA)
+                    <Sparkles className="h-4.5 w-4.5 text-blue-500" /> Popup Promocional
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Controle o banner promocional exibido na página inicial imediatamente antes do rodapé.
+                    Configure um popup moderno e responsivo para engajar os clientes ao acessarem a loja.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
@@ -726,190 +763,193 @@ export default function AdminSettings() {
                   <div className="flex items-center space-x-3 h-12 bg-slate-50 border border-slate-150 p-4 rounded-xl shadow-sm">
                     <label className="relative inline-flex items-center cursor-pointer select-none">
                       <input 
-                        id="cta-active"
+                        id="popup-active"
                         type="checkbox" 
-                        checked={ctaActive} 
-                        onChange={(e) => setCtaActive(e.target.checked)} 
+                        checked={popupActive} 
+                        onChange={(e) => setPopupActive(e.target.checked)} 
                         className="sr-only peer" 
                       />
                       <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full.5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-blue-600"></div>
-                      <span className="ml-3 text-xs font-bold text-slate-700">Ativar Banner na Home</span>
+                      <span className="ml-3 text-xs font-bold text-slate-700">Ativar Popup na Loja</span>
                     </label>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Title */}
                     <div className="space-y-1.5">
-                      <Label htmlFor="cta-title" className="text-xs font-semibold text-slate-700">Título *</Label>
+                      <Label htmlFor="popup-title" className="text-xs font-semibold text-slate-700">Título do Popup *</Label>
                       <Input 
-                        id="cta-title" 
-                        value={ctaTitle} 
-                        onChange={(e) => setCtaTitle(e.target.value)}
-                        placeholder="Ex: Frete Grátis acima de R$ {valor}"
+                        id="popup-title" 
+                        value={popupTitle} 
+                        onChange={(e) => setPopupTitle(e.target.value)}
+                        placeholder="Ex: Cupom de 10% Off!"
                         className="rounded-xl border-slate-200 h-10 bg-white" 
                         required
                       />
-                      <p className="text-[10px] text-slate-400">Use <code className="font-mono bg-slate-100 px-1 rounded">{`{valor}`}</code> para exibir o valor dinamicamente.</p>
                     </div>
 
-                    {/* Value */}
+                    {/* Delay Option */}
                     <div className="space-y-1.5">
-                      <Label htmlFor="cta-value" className="text-xs font-semibold text-slate-700">Valor (R$)</Label>
+                      <Label htmlFor="popup-delay" className="text-xs font-semibold text-slate-700">Tempo de Espera para Aparecer (segundos)</Label>
                       <Input 
-                        id="cta-value" 
+                        id="popup-delay" 
                         type="number" 
-                        value={ctaValue} 
-                        onChange={(e) => setCtaValue(e.target.value === '' ? '' : Number(e.target.value))}
-                        placeholder="Ex: 50"
-                        className="rounded-xl border-slate-200 h-10 bg-white" 
-                      />
-                      <p className="text-[10px] text-slate-400">Gera o formato R$ e substitui o placeholder.</p>
-                    </div>
-                  </div>
-
-                  {/* Subtitle */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cta-subtitle" className="text-xs font-semibold text-slate-700">Subtítulo</Label>
-                    <textarea 
-                      id="cta-subtitle" 
-                      rows={3}
-                      value={ctaSubtitle} 
-                      onChange={(e) => setCtaSubtitle(e.target.value)}
-                      placeholder="Ex: Aproveite condições especiais em toda a loja. Parcele em até {parcelas} sem juros."
-                      className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans" 
-                    />
-                    <p className="text-[10px] text-slate-400">Use <code className="font-mono bg-slate-100 px-1 rounded">{`{parcelas}`}</code> para exibir o número de parcelas dinamicamente.</p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Installments */}
-                    <div className="space-y-1.5">
-                      <Label htmlFor="cta-installments" className="text-xs font-semibold text-slate-705">Número de Parcelas</Label>
-                      <Input 
-                        id="cta-installments" 
-                        type="number" 
-                        value={ctaInstallments} 
-                        onChange={(e) => setCtaInstallments(e.target.value === '' ? '' : Math.floor(Number(e.target.value)))}
+                        min={1}
+                        value={popupDelaySeconds} 
+                        onChange={(e) => setPopupDelaySeconds(Number(e.target.value) || 5)}
                         placeholder="Ex: 5"
                         className="rounded-xl border-slate-200 h-10 bg-white" 
                       />
                     </div>
+                  </div>
 
+                  {/* Text */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="popup-text" className="text-xs font-semibold text-slate-700">Texto / Mensagem do Popup</Label>
+                    <textarea 
+                      id="popup-text" 
+                      rows={3}
+                      value={popupText} 
+                      onChange={(e) => setPopupText(e.target.value)}
+                      placeholder="Ex: Cadastre-se ou fale conosco agora para garantir desconto exclusivo em sua primeira compra!"
+                      className="w-full rounded-xl border border-slate-200 p-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans" 
+                    />
+                  </div>
+
+                  {/* Image Uploader */}
+                  <div className="pt-4 border-t border-slate-100">
+                    <ImageUploader
+                      value={popupImageUrl}
+                      onChange={setPopupImageUrl}
+                      folder="settings"
+                      label="Imagem do Popup (Opcional - Proporção de Banner Recomendada)"
+                      placeholder="Cole a URL ou envie uma imagem"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Se você enviar uma imagem, ela será exibida no lado esquerdo do popup em telas maiores e no topo em celulares. Caso contrário, o popup exibirá um layout limpo focado no texto.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
                     {/* Button Text */}
                     <div className="space-y-1.5">
-                      <Label htmlFor="cta-btn-text" className="text-xs font-semibold text-slate-705">Texto do Botão</Label>
+                      <Label htmlFor="popup-btn-text" className="text-xs font-semibold text-slate-700">Texto do Botão de Ação</Label>
                       <Input 
-                        id="cta-btn-text" 
-                        value={ctaButtonText} 
-                        onChange={(e) => setCtaButtonText(e.target.value)}
-                        placeholder="Ex: Comprar Agora"
+                        id="popup-btn-text" 
+                        value={popupButtonText} 
+                        onChange={(e) => setPopupButtonText(e.target.value)}
+                        placeholder="Ex: Garantir Meu Desconto"
                         className="rounded-xl border-slate-200 h-10 bg-white" 
                       />
                     </div>
 
-                    {/* Button Link */}
+                    {/* Button Action Type */}
                     <div className="space-y-1.5">
-                      <Label htmlFor="cta-btn-link" className="text-xs font-semibold text-slate-705">Link do Botão</Label>
-                      <Input 
-                        id="cta-btn-link" 
-                        value={ctaButtonLink} 
-                        onChange={(e) => setCtaButtonLink(e.target.value)}
-                        placeholder="Ex: /categoria/novidades"
-                        className="rounded-xl border-slate-200 h-10 bg-white" 
-                      />
+                      <Label htmlFor="popup-btn-action" className="text-xs font-semibold text-slate-700">Ação do Botão</Label>
+                      <select
+                        id="popup-btn-action"
+                        value={popupButtonAction}
+                        onChange={(e) => setPopupButtonAction(e.target.value as 'whatsapp' | 'email' | 'link')}
+                        className="w-full rounded-xl border border-slate-200 h-10 px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                      >
+                        <option value="whatsapp">Falar no WhatsApp</option>
+                        <option value="email">Enviar E-mail</option>
+                        <option value="link">Link Personalizado / Página do Site</option>
+                      </select>
                     </div>
                   </div>
 
-                  {/* Colors */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="cta-bgcolor" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                        <Palette className="h-3.5 w-3.5" /> Cor de Fundo
-                      </Label>
-                      <div className="flex gap-2">
-                        <input 
-                          id="cta-bgcolor" 
-                          type="color" 
-                          value={ctaBgColor} 
-                          onChange={(e) => setCtaBgColor(e.target.value)}
-                          className="w-12 h-10 border border-slate-200 rounded-xl cursor-pointer bg-transparent p-0" 
-                        />
-                        <Input 
-                          id="cta-bgcolor-hex" 
-                          value={ctaBgColor} 
-                          onChange={(e) => setCtaBgColor(e.target.value)}
-                          className="rounded-xl border-slate-200 h-10 bg-white font-mono uppercase" 
-                          maxLength={7}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1.5">
-                      <Label htmlFor="cta-textcolor" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                        <Palette className="h-3.5 w-3.5" /> Cor do Texto
-                      </Label>
-                      <div className="flex gap-2">
-                        <input 
-                          id="cta-textcolor" 
-                          type="color" 
-                          value={ctaTextColor} 
-                          onChange={(e) => setCtaTextColor(e.target.value)}
-                          className="w-12 h-10 border border-slate-200 rounded-xl cursor-pointer bg-transparent p-0" 
-                        />
-                        <Input 
-                          id="cta-textcolor-hex" 
-                          value={ctaTextColor} 
-                          onChange={(e) => setCtaTextColor(e.target.value)}
-                          className="rounded-xl border-slate-200 h-10 bg-white font-mono uppercase" 
-                          maxLength={7}
-                        />
-                      </div>
-                    </div>
+                  {/* Button Destination */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="popup-btn-dest" className="text-xs font-semibold text-slate-700">
+                      {popupButtonAction === 'whatsapp' && 'Número de Celular para WhatsApp (Ex: +5543999998888)'}
+                      {popupButtonAction === 'email' && 'E-mail de Destino'}
+                      {popupButtonAction === 'link' && 'Link ou URL de Destino (Ex: /categoria/promocoes ou https://dilermano.com)'}
+                    </Label>
+                    <Input 
+                      id="popup-btn-dest" 
+                      value={popupButtonDestination} 
+                      onChange={(e) => setPopupButtonDestination(e.target.value)}
+                      placeholder={
+                        popupButtonAction === 'whatsapp' 
+                          ? '+5543999998888' 
+                          : popupButtonAction === 'email' 
+                          ? 'contato@dilermano.com' 
+                          : '/categoria/promocoes'
+                      }
+                      className="rounded-xl border-slate-200 h-10 bg-white font-mono" 
+                    />
+                  </div>
+
+                  {/* Switch Once Per Visitor */}
+                  <div className="flex items-center space-x-3 h-12 bg-slate-50 border border-slate-150 p-4 rounded-xl shadow-sm">
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input 
+                        id="popup-once"
+                        type="checkbox" 
+                        checked={popupOncePerVisitor} 
+                        onChange={(e) => setPopupOncePerVisitor(e.target.checked)} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full.5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-blue-600"></div>
+                      <span className="ml-3 text-xs font-bold text-slate-700">Exibir apenas uma vez por visitante</span>
+                    </label>
                   </div>
 
                   {/* Live Preview Section */}
                   <div className="border border-dashed border-slate-300 rounded-3xl p-4 bg-slate-50/50 mt-4">
                     <p className="text-xs uppercase font-extrabold tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                      <Palette className="h-3.5 w-3.5 text-slate-400" /> Pré-visualização do Banner (Tempo Real)
+                      <Eye className="h-3.5 w-3.5 text-slate-400" /> Pré-visualização do Popup (Tempo Real)
                     </p>
                     
-                    {ctaActive ? (
-                      <div 
-                        className="rounded-[2rem] p-6 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative"
-                        style={{ backgroundColor: ctaBgColor, color: ctaTextColor }}
-                      >
-                        <div className="relative z-10 max-w-md space-y-4 text-left">
-                          <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
-                            OFERTA ESPECIAL
-                          </span>
-                          <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-none">
-                            {resolvePlaceholders(ctaTitle, ctaValue, ctaInstallments) || 'Sem Título'}
-                          </h2>
-                          <p className="text-xs opacity-90 whitespace-pre-line leading-relaxed">
-                            {resolvePlaceholders(ctaSubtitle, ctaValue, ctaInstallments) || 'Sem Subtítulo'}
-                          </p>
-                          <button 
-                            disabled 
-                            className="font-bold text-xs h-10 px-6 rounded-lg bg-white shadow-md cursor-not-allowed uppercase"
-                            style={{ backgroundColor: ctaTextColor, color: ctaBgColor }}
-                          >
-                            {ctaButtonText || 'Comprar Agora'}
+                    {popupActive ? (
+                      <div className="flex items-center justify-center bg-slate-800/20 p-6 rounded-2xl border border-slate-200/50 min-h-[300px]">
+                        <div className="bg-white rounded-2xl overflow-hidden shadow-xl max-w-lg w-full flex flex-col sm:flex-row border border-slate-100 relative">
+                          <button disabled className="absolute top-3 right-3 bg-slate-100 text-slate-700 rounded-full p-1.5 opacity-80 cursor-not-allowed">
+                            <X className="h-3 w-3" />
                           </button>
+                          
+                          {popupImageUrl ? (
+                            <div className="sm:w-2/5 h-28 sm:h-auto relative bg-slate-50 shrink-0">
+                              <img 
+                                src={popupImageUrl} 
+                                alt="Preview" 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="hidden sm:flex sm:w-1/3 bg-slate-50 items-center justify-center border-r border-slate-100 shrink-0 p-4">
+                              <div className="text-center space-y-1 text-blue-500">
+                                <Sparkles className="h-8 w-8 mx-auto" />
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="flex-1 p-6 flex flex-col justify-center space-y-4 text-left">
+                            <div className="space-y-1.5">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-extrabold uppercase tracking-wider">
+                                <Sparkles className="h-2.5 w-2.5" /> Cupom Ativo
+                              </span>
+                              <h4 className="text-lg font-black text-slate-900 tracking-tight leading-none uppercase">
+                                {popupTitle || 'Sem Título'}
+                              </h4>
+                              {popupText && (
+                                <p className="text-slate-500 text-xs font-semibold leading-relaxed whitespace-pre-line">
+                                  {popupText}
+                                </p>
+                              )}
+                            </div>
+                            
+                            <button disabled className="w-full bg-blue-600 text-white font-black text-xs uppercase py-3 px-4 rounded-xl shadow-md cursor-not-allowed text-center">
+                              {popupButtonText || 'Garantir Benefício'}
+                            </button>
+                          </div>
                         </div>
-                        <div className="relative z-10 w-24 md:w-32 aspect-square shrink-0">
-                           <img 
-                             src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop" 
-                             alt="Oferta Especial" 
-                             className="rounded-2xl shadow-xl rotate-3 hover:rotate-0 transition-transform duration-500 w-full h-full object-cover"
-                           />
-                        </div>
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
                       </div>
                     ) : (
                       <div className="border border-dashed border-slate-200 rounded-[2rem] p-8 text-center text-slate-400 bg-white">
-                        <p className="text-xs font-semibold">O Banner Promocional está desativado.</p>
-                        <p className="text-[10px] text-slate-400 mt-1">Habilite "Ativar Banner na Home" acima para pré-visualizar e exibir o banner.</p>
+                        <p className="text-xs font-semibold">O Popup Promocional está desabilitado nas configurações.</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Marque a opção "Ativar Popup na Loja" para pré-visualizar.</p>
                       </div>
                     )}
                   </div>
@@ -922,14 +962,14 @@ export default function AdminSettings() {
                   type="button"
                   variant="outline"
                   className="border-slate-200 hover:bg-slate-50 font-bold rounded-xl h-11 px-6 cursor-pointer"
-                  onClick={handleRestorePromoDefaults}
+                  onClick={handleRestorePopupDefaults}
                 >
-                  Restaurar Padrão
+                  Restaurar Padrões
                 </Button>
 
                 <Button 
                   className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl gap-2 h-11 px-8 cursor-pointer shadow-lg shadow-blue-500/10"
-                  onClick={handleSavePromoCTA}
+                  onClick={handleSavePopup}
                   disabled={saving}
                 >
                   <Save className="h-4 w-4" /> {saving ? 'Salvando...' : 'Salvar Alterações'}
