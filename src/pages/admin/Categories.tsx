@@ -161,8 +161,8 @@ export default function AdminCategories() {
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Ativas (Lim. 6)</span>
-            <span className="text-xl font-extrabold text-emerald-600">{loading ? '...' : `${activeCount}/6`}</span>
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Ativas (Lim. 12)</span>
+            <span className="text-xl font-extrabold text-emerald-600">{loading ? '...' : `${activeCount}/12`}</span>
           </div>
         </div>
 
