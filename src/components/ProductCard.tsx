@@ -22,7 +22,7 @@ export interface ProductCardProps {
 export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addItem } = useCart();
   const { isFavorited, toggleFavorite } = useWishlist();
-  const imageUrl = product.images?.[0]?.url || "https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=2070&auto=format&fit=crop";
+  const imageUrl = product.images?.[0]?.url || "https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=600&auto=format&fit=crop";
   const hasDiscount = product.originalPrice && product.originalPrice > product.price;
 
   const isFav = isFavorited(product.id);
@@ -58,6 +58,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             src={imageUrl} 
             alt={product.name}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            loading="lazy"
           />
         </Link>
         

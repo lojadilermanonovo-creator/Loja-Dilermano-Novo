@@ -11,21 +11,35 @@ const STATIC_SLIDES = [
     id: 'static-1',
     title: "Sua melhor versão começa aqui",
     subtitle: "Coleção Outono/Inverno 2026 já disponível.",
-    imageUrl: "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80&w=2070&auto=format&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80&w=1200&auto=format&fit=crop",
     color: "bg-ocean"
   },
   {
     id: 'static-2',
     title: "Estilo que inspira",
     subtitle: "Peças exclusivas selecionadas para você.",
-    imageUrl: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=2070&auto=format&fit=crop",
+    imageUrl: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=1200&auto=format&fit=crop",
     color: "bg-sunset"
   }
 ];
 
 export default function HeroCarousel() {
-  const [slides, setSlides] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [slides, setSlides] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('dilermano_cache_banners');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem('dilermano_cache_banners');
+      return !cached;
+    } catch {
+      return true;
+    }
+  });
   const [current, setCurrent] = useState(0);
   const navigate = useNavigate();
 
@@ -37,8 +51,9 @@ export default function HeroCarousel() {
           where('isActive', '==', true)
         );
         const snap = await getDocs(q);
+        let loadedSlides: any[] = [];
         if (!snap.empty) {
-          const loadedSlides = snap.docs.map(doc => {
+          loadedSlides = snap.docs.map(doc => {
             const data = doc.data();
             return {
               id: doc.id,
@@ -61,8 +76,18 @@ export default function HeroCarousel() {
           });
 
           setSlides(loadedSlides);
+          try {
+            localStorage.setItem('dilermano_cache_banners', JSON.stringify(loadedSlides));
+          } catch (e) {
+            console.warn("Could not write banners cache:", e);
+          }
         } else {
           setSlides(STATIC_SLIDES);
+          try {
+            localStorage.setItem('dilermano_cache_banners', JSON.stringify(STATIC_SLIDES));
+          } catch (e) {
+            console.warn("Could not write banners cache:", e);
+          }
         }
       } catch (err) {
         console.warn("Banners collection fallback loaded STATIC_SLIDES:", err);
@@ -113,10 +138,13 @@ export default function HeroCarousel() {
           transition={{ duration: 0.8 }}
           className="absolute inset-0"
         >
-          <div 
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${slides[current].imageUrl})` }}
-          >
+          <div className="absolute inset-0">
+            <img 
+              src={slides[current].imageUrl}
+              alt={slides[current].title || "Banner"}
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="eager"
+            />
             <div className="absolute inset-0 bg-black/40" />
           </div>
           

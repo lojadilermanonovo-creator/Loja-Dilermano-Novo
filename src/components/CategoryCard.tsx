@@ -19,9 +19,10 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({ category }) => {
         transition={{ duration: 0.2 }}
       >
         <img 
-          src={category.imageUrl || "https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=2070&auto=format&fit=crop"} 
+          src={category.imageUrl || "https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=500&auto=format&fit=crop"} 
           alt={category.name}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+          loading="lazy"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         <div className="absolute bottom-4 left-0 right-0 text-center">

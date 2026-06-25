@@ -11,10 +11,40 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export default function Index() {
-  const [categories, setCategories] = useState<any[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
-  const [newProducts, setNewProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('dilermano_cache_categories');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [featuredProducts, setFeaturedProducts] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('dilermano_cache_featured');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [newProducts, setNewProducts] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('dilermano_cache_new');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      const catCached = localStorage.getItem('dilermano_cache_categories');
+      const featCached = localStorage.getItem('dilermano_cache_featured');
+      const newCached = localStorage.getItem('dilermano_cache_new');
+      return !(catCached || featCached || newCached);
+    } catch {
+      return true;
+    }
+  });
   const [promoCTA, setPromoCTA] = useState<any>({
     active: true,
     title: 'Frete Grátis acima de R$ {valor}',
@@ -53,37 +83,54 @@ export default function Index() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch active categories (max 6)
+        // Build active categories query (max 6)
         const categoriesQuery = query(
           collection(db, 'categories'),
           where('isActive', '==', true),
           orderBy('sortOrder', 'asc'),
           limit(6)
         );
-        const categoriesSnap = await getDocs(categoriesQuery);
-        setCategories(categoriesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
 
-        // Fetch featured products
+        // Build featured products query
         const featuredQuery = query(
           collection(db, 'products'),
           where('isFeatured', '==', true),
           where('isActive', '==', true),
           limit(8)
         );
-        const featuredSnap = await getDocs(featuredQuery);
-        setFeaturedProducts(featuredSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
 
-        // Fetch new products
+        // Build new products query
         const newQuery = query(
           collection(db, 'products'),
           where('isNew', '==', true),
           where('isActive', '==', true),
           limit(8)
         );
-        const newSnap = await getDocs(newQuery);
-        setNewProducts(newSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) })));
 
-        // Fetch Promo CTA Settings is now handled via real-time onSnapshot below
+        // Execute all Firestore requests in parallel to eliminate blocking overhead
+        const [categoriesSnap, featuredSnap, newSnap] = await Promise.all([
+          getDocs(categoriesQuery),
+          getDocs(featuredQuery),
+          getDocs(newQuery)
+        ]);
+
+        const loadedCategories = categoriesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+        const loadedFeatured = featuredSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+        const loadedNew = newSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+
+        setCategories(loadedCategories);
+        setFeaturedProducts(loadedFeatured);
+        setNewProducts(loadedNew);
+
+        // Cache the newly loaded arrays locally
+        try {
+          localStorage.setItem('dilermano_cache_categories', JSON.stringify(loadedCategories));
+          localStorage.setItem('dilermano_cache_featured', JSON.stringify(loadedFeatured));
+          localStorage.setItem('dilermano_cache_new', JSON.stringify(loadedNew));
+        } catch (e) {
+          console.warn("Could not write categories or products cache:", e);
+        }
+
       } catch (err: any) {
         // Check for "Database not found" specifically to avoid noisy errors
         if (err?.message?.includes('Database') && err?.message?.includes('not found')) {
@@ -154,12 +201,12 @@ export default function Index() {
               ))}
               {/* Default categories if none found */}
               {categories.length === 0 && [
-                { id: 'novidades', name: 'Novidades', imageUrl: 'https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=2070&auto=format&fit=crop' },
-                { id: 'promocoes', name: 'Promoções', imageUrl: 'https://images.unsplash.com/photo-1544441893-675973e31985?q=80&w=2070&auto=format&fit=crop' },
-                { id: 'masculino', name: 'Masculino', imageUrl: 'https://images.unsplash.com/photo-1516257984877-a03a01ae1b89?q=80&w=2070&auto=format&fit=crop' },
-                { id: 'feminino', name: 'Feminino', imageUrl: 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?q=80&w=2070&auto=format&fit=crop' },
-                { id: 'acessorios', name: 'Acessórios', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=2070&auto=format&fit=crop' },
-                { id: 'calcados', name: 'Calçados', imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?q=80&w=2070&auto=format&fit=crop' }
+                { id: 'novidades', name: 'Novidades', imageUrl: 'https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=400&auto=format&fit=crop' },
+                { id: 'promocoes', name: 'Promoções', imageUrl: 'https://images.unsplash.com/photo-1544441893-675973e31985?q=80&w=400&auto=format&fit=crop' },
+                { id: 'masculino', name: 'Masculino', imageUrl: 'https://images.unsplash.com/photo-1516257984877-a03a01ae1b89?q=80&w=400&auto=format&fit=crop' },
+                { id: 'feminino', name: 'Feminino', imageUrl: 'https://images.unsplash.com/photo-1525507119028-ed4c629a60a3?q=80&w=400&auto=format&fit=crop' },
+                { id: 'acessorios', name: 'Acessórios', imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=400&auto=format&fit=crop' },
+                { id: 'calcados', name: 'Calçados', imageUrl: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?q=80&w=400&auto=format&fit=crop' }
               ].map(cat => (
                  <CategoryCard key={cat.id} category={cat} />
               ))}
@@ -249,9 +296,10 @@ export default function Index() {
             </div>
             <div className="relative z-10 w-full md:w-1/2 aspect-square max-w-sm">
                <img 
-                 src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop" 
+                 src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=600&auto=format&fit=crop" 
                  alt="Oferta Especial" 
                  className="rounded-3xl shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500"
+                 loading="lazy"
                />
             </div>
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>

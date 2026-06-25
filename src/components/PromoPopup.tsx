@@ -24,8 +24,8 @@ interface PopupData {
   btnTextColor?: string;
 }
 
-// In-memory module state to avoid reopening on client-side route transitions
-let hasShownInThisLoad = false;
+// In-memory module state to avoid reopening on client-side route transitions during the same rendering run
+let isScheduledInThisRun = false;
 
 export default function PromoPopup() {
   const [popup, setPopup] = useState<PopupData | null>(null);
@@ -56,27 +56,42 @@ export default function PromoPopup() {
       return;
     }
 
-    // Check if dismissed or shown in current page load session
-    if (hasShownInThisLoad) {
+    // 1. Check session storage lock (prevents showing multiple times in the same browsing session)
+    const sessionShown = sessionStorage.getItem('dilermano_popup_session_shown');
+    if (sessionShown === 'true') {
       return;
     }
 
-    // Check if dismissed as visitor (localStorage)
+    // 2. Check local storage lock (if oncePerVisitor is enabled, prevent showing to the same visitor across sessions)
     if (popup.oncePerVisitor) {
       const visitorDismissed = localStorage.getItem('dilermano_popup_visitor_dismissed');
       if (visitorDismissed === 'true') {
         return;
       }
+    } else {
+      // If oncePerVisitor is disabled, we clean up any old visitor dismiss local storage
+      // so that if they later disable it, it doesn't accidentally block them.
+      localStorage.removeItem('dilermano_popup_visitor_dismissed');
+    }
+
+    // 3. Avoid setting multiple simultaneous timeouts
+    if (isScheduledInThisRun) {
+      return;
     }
 
     // Delay trigger
     const delayMs = (popup.delaySeconds || 5) * 1000;
+    isScheduledInThisRun = true;
     const timer = setTimeout(() => {
       setIsOpen(true);
-      hasShownInThisLoad = true;
+      // Mark as shown in this session immediately when it opens
+      sessionStorage.setItem('dilermano_popup_session_shown', 'true');
     }, delayMs);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      isScheduledInThisRun = false;
+    };
   }, [popup]);
 
   // Handle checking and executing pending action after login
@@ -100,7 +115,7 @@ export default function PromoPopup() {
 
   const handleClose = () => {
     setIsOpen(false);
-    hasShownInThisLoad = true;
+    sessionStorage.setItem('dilermano_popup_session_shown', 'true');
     
     // Persist as visitor if set
     if (popup?.oncePerVisitor) {
