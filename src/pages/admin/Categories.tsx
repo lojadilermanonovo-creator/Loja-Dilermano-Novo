@@ -86,8 +86,8 @@ export default function AdminCategories() {
       if (selectedCategory) {
         // Edit flow
         const activeCountExcludingMe = categories.filter(c => c.isActive && c.id !== selectedCategory.id).length;
-        if (isActive && activeCountExcludingMe >= 6) {
-          toast.error('O sistema permite no máximo 6 categorias ativas em exibição');
+        if (isActive && activeCountExcludingMe >= 12) {
+          toast.error('O sistema permite no máximo 12 categorias ativas em exibição');
           return;
         }
 
@@ -95,8 +95,8 @@ export default function AdminCategories() {
         toast.success('Categoria atualizada com sucesso');
       } else {
         // Create flow
-        if (isActive && activeCount >= 6) {
-           toast.error('Limite excedido! Limite de 6 categorias ativas permitido.');
+        if (isActive && activeCount >= 12) {
+           toast.error('Limite excedido! Limite de 12 categorias ativas permitido.');
            return;
         }
         await setDoc(doc(collection(db, 'categories')), {
@@ -133,7 +133,7 @@ export default function AdminCategories() {
             Categorias do Site
           </h1>
           <p className="text-slate-500 mt-1">
-            Organize seus produtos. No máximo 6 categorias ativas aparecem na vitrine do seu site.
+            Organize seus produtos. No máximo 12 categorias ativas aparecem na vitrine do seu site.
           </p>
         </div>
         <Button 

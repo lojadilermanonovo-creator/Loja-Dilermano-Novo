@@ -83,12 +83,12 @@ export default function Index() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Build active categories query (max 6)
+        // Build active categories query (max 12)
         const categoriesQuery = query(
           collection(db, 'categories'),
           where('isActive', '==', true),
           orderBy('sortOrder', 'asc'),
-          limit(6)
+          limit(12)
         );
 
         // Build featured products query
@@ -191,7 +191,7 @@ export default function Index() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {loading ? (
-            Array.from({ length: 6 }).map((_, i) => (
+            Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className="aspect-square rounded-2xl bg-neutral-200 dark:bg-neutral-800 animate-pulse" />
             ))
           ) : (

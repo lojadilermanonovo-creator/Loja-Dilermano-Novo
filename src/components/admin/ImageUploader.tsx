@@ -1,25 +1,33 @@
 import React, { useState, useRef } from 'react';
 import { storage } from '@/src/integrations/firebase/client';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { Upload, X, Check, Loader2, Link as LinkIcon } from 'lucide-react';
+import { Upload, X, Check, Loader2, Link as LinkIcon, Film } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 interface ImageUploaderProps {
   value: string;
-  onChange: (url: string) => void;
+  onChange: (url: string, fileType?: 'image' | 'video') => void;
   folder: string;
   label?: string;
   placeholder?: string;
+  acceptVideo?: boolean;
 }
+
+const isVideoUrl = (url: string) => {
+  if (!url) return false;
+  const cleanUrl = url.split('?')[0].toLowerCase();
+  return cleanUrl.endsWith('.mp4');
+};
 
 export default function ImageUploader({
   value,
   onChange,
   folder,
-  label = 'Imagem',
-  placeholder = 'Cole a URL ou suba um arquivo'
+  label = 'Imagem ou Vídeo',
+  placeholder = 'Cole a URL ou suba um arquivo',
+  acceptVideo = false
 }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -29,15 +37,25 @@ export default function ImageUploader({
   const handleUploadFile = (file: File) => {
     if (!file) return;
 
-    // Check file size limit (e.g. 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('O arquivo deve ter no máximo 5MB.');
+    const isMp4 = file.type === 'video/mp4' || file.name.endsWith('.mp4');
+
+    // Check file size limit
+    const sizeLimit = isMp4 ? 25 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > sizeLimit) {
+      toast.error(`O arquivo deve ter no máximo ${isMp4 ? '25MB' : '5MB'}.`);
       return;
     }
 
-    const validExtensions = ['image/png', 'image/jpeg', 'image/jpg'];
-    if (!validExtensions.includes(file.type)) {
-      toast.error('Apenas arquivos de imagem PNG, JPG ou JPEG são aceitos.');
+    const validImageExtensions = ['image/png', 'image/jpeg', 'image/jpg'];
+    const isValidImage = validImageExtensions.includes(file.type);
+    const isValidVideo = acceptVideo && isMp4;
+
+    if (!isValidImage && !isValidVideo) {
+      if (acceptVideo) {
+        toast.error('Apenas arquivos de imagem PNG, JPG, JPEG ou vídeo MP4 são aceitos.');
+      } else {
+        toast.error('Apenas arquivos de imagem PNG, JPG ou JPEG são aceitos.');
+      }
       return;
     }
 
@@ -60,16 +78,17 @@ export default function ImageUploader({
       (error) => {
         console.error('Erro no upload Storage:', error);
         setUploading(false);
-        toast.error('Erro ao fazer upload da imagem.');
+        toast.error('Erro ao fazer upload do arquivo.');
       },
       async () => {
         try {
           const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          onChange(downloadUrl);
+          const detectedType = isMp4 ? 'video' : 'image';
+          onChange(downloadUrl, detectedType);
           setUploading(false);
-          toast.success('Imagem enviada com sucesso!');
+          toast.success(detectedType === 'video' ? 'Vídeo enviado com sucesso!' : 'Imagem enviada com sucesso!');
         } catch (err) {
-          console.error('Erro ao pegar URL da imagem:', err);
+          console.error('Erro ao pegar URL:', err);
           setUploading(false);
           toast.error('Falha ao obter URL pública do arquivo.');
         }
@@ -95,6 +114,8 @@ export default function ImageUploader({
     }
   };
 
+  const isCurrentVideo = isVideoUrl(value);
+
   return (
     <div className="space-y-2">
       {label && <label className="text-slate-700 font-semibold text-xs block">{label}</label>}
@@ -114,7 +135,7 @@ export default function ImageUploader({
       >
         <input
           type="file"
-          accept=".png,.jpg,.jpeg"
+          accept={acceptVideo ? ".png,.jpg,.jpeg,.mp4" : ".png,.jpg,.jpeg"}
           className="hidden"
           ref={fileInputRef}
           onChange={(e) => {
@@ -136,19 +157,35 @@ export default function ImageUploader({
         ) : value ? (
           <div className="space-y-3 w-full flex flex-col items-center">
             <div className="relative group max-w-[150px] aspect-video rounded border overflow-hidden bg-slate-100 shadow-sm">
-              <img
-                src={value}
-                alt="Upload Preview"
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/150x100?text=Erro+Carregamento';
-                }}
-              />
+              {isCurrentVideo ? (
+                <div className="relative w-full h-full">
+                  <video
+                    src={value}
+                    className="w-full h-full object-cover"
+                    muted
+                    loop
+                    autoPlay
+                    playsInline
+                  />
+                  <div className="absolute bottom-1 right-1 bg-black/60 text-white rounded p-0.5">
+                    <Film className="h-3 w-3" />
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={value}
+                  alt="Upload Preview"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://placehold.co/150x100?text=Erro+Carregamento';
+                  }}
+                />
+              )}
               <button
                 type="button"
                 onClick={() => onChange('')}
-                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 opacity-90 transition-colors shadow"
+                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 opacity-90 transition-colors shadow cursor-pointer"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -161,20 +198,23 @@ export default function ImageUploader({
         ) : (
           <div className="space-y-2 py-2 flex flex-col items-center">
             <div className="p-3 bg-white rounded-full shadow-sm text-slate-400">
-              <Upload className="h-5 w-5" />
+              {acceptVideo ? <Film className="h-5 w-5" /> : <Upload className="h-5 w-5" />}
             </div>
             <div className="text-xs">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-ocean font-semibold hover:underline"
+                className="text-ocean font-semibold hover:underline cursor-pointer"
               >
                 Clique para enviar
               </button>
               <span className="text-slate-400"> ou arraste o arquivo aqui</span>
             </div>
             <div className="text-[10px] text-slate-400">
-              Formatos aceitos: PNG, JPG, JPEG (Máx 5MB)
+              {acceptVideo 
+                ? 'Formatos aceitos: PNG, JPG, JPEG, MP4 (Imagem máx 5MB, Vídeo máx 25MB)' 
+                : 'Formatos aceitos: PNG, JPG, JPEG (Máx 5MB)'
+              }
             </div>
           </div>
         )}
@@ -189,7 +229,11 @@ export default function ImageUploader({
             className="pl-9 h-9 text-xs"
             placeholder={placeholder}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              const type = isVideoUrl(val) ? 'video' : 'image';
+              onChange(val, type);
+            }}
           />
         </div>
         {value && (

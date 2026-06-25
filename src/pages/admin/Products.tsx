@@ -178,12 +178,19 @@ export default function AdminProducts() {
               filterProducts.map((product) => (
                 <TableRow key={product.id} className="hover:bg-slate-50/40 transition-colors">
                   <TableCell className="pl-6 py-4">
-                    <div className="h-14 w-14 rounded-xl overflow-hidden border border-slate-100 shrink-0 bg-slate-100">
-                      <img 
-                        src={product.images?.[0]?.url || "https://placehold.co/120x120?text=Sem+Foto"} 
-                        className="h-full w-full object-cover" 
-                        alt={product.name}
-                      />
+                    <div className="h-14 w-14 rounded-xl overflow-hidden border border-slate-100 shrink-0 bg-slate-100 flex items-center justify-center">
+                      {(() => {
+                        const firstMedia = product.images?.[0];
+                        const url = firstMedia?.url || "";
+                        const isVideo = firstMedia?.type === 'video' || (url.split('?')[0].toLowerCase().endsWith('.mp4'));
+                        if (!url) {
+                          return <img src="https://placehold.co/120x120?text=Sem+Foto" className="h-full w-full object-cover" alt="" />;
+                        }
+                        if (isVideo) {
+                          return <video src={url} className="h-full w-full object-cover" muted loop autoPlay playsInline />;
+                        }
+                        return <img src={url} className="h-full w-full object-cover" alt={product.name} referrerPolicy="no-referrer" />;
+                      })()}
                     </div>
                   </TableCell>
 

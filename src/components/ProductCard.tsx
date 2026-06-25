@@ -25,6 +25,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const imageUrl = product.images?.[0]?.url || "https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=600&auto=format&fit=crop";
   const hasDiscount = product.originalPrice && product.originalPrice > product.price;
 
+  const isVideoUrl = (url: string) => {
+    if (!url) return false;
+    const cleanUrl = url.split('?')[0].toLowerCase();
+    return cleanUrl.endsWith('.mp4');
+  };
+
+  const isVideo = isVideoUrl(imageUrl);
+
   const isFav = isFavorited(product.id);
 
   const handleToggleFavorite = (e: React.MouseEvent) => {
@@ -54,12 +62,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     <div className="group relative flex flex-col gap-3">
       <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-surface-elevated">
         <Link to={`/produto/${product.id}`} className="block h-full w-full">
-          <img 
-            src={imageUrl} 
-            alt={product.name}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-            loading="lazy"
-          />
+          {isVideo ? (
+            <video 
+              src={imageUrl} 
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" 
+              muted 
+              loop 
+              autoPlay 
+              playsInline 
+            />
+          ) : (
+            <img 
+              src={imageUrl} 
+              alt={product.name}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+              loading="lazy"
+            />
+          )}
         </Link>
         
         <button 

@@ -24,7 +24,8 @@ interface PopupData {
   btnTextColor?: string;
 }
 
-// In-memory module state to avoid reopening on client-side route transitions during the same rendering run
+// In-memory module state to avoid reopening on client-side route transitions
+let hasShownPromoPopupInThisLoad = false;
 let isScheduledInThisRun = false;
 
 export default function PromoPopup() {
@@ -56,9 +57,8 @@ export default function PromoPopup() {
       return;
     }
 
-    // 1. Check session storage lock (prevents showing multiple times in the same browsing session)
-    const sessionShown = sessionStorage.getItem('dilermano_popup_session_shown');
-    if (sessionShown === 'true') {
+    // 1. Check if already shown or dismissed in current page load session (prevents showing multiple times in the same session)
+    if (hasShownPromoPopupInThisLoad) {
       return;
     }
 
@@ -85,7 +85,7 @@ export default function PromoPopup() {
     const timer = setTimeout(() => {
       setIsOpen(true);
       // Mark as shown in this session immediately when it opens
-      sessionStorage.setItem('dilermano_popup_session_shown', 'true');
+      hasShownPromoPopupInThisLoad = true;
     }, delayMs);
 
     return () => {
@@ -115,7 +115,7 @@ export default function PromoPopup() {
 
   const handleClose = () => {
     setIsOpen(false);
-    sessionStorage.setItem('dilermano_popup_session_shown', 'true');
+    hasShownPromoPopupInThisLoad = true;
     
     // Persist as visitor if set
     if (popup?.oncePerVisitor) {

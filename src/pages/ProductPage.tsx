@@ -208,6 +208,15 @@ export default function ProductPage() {
   const hasDiscount = product.originalPrice && product.originalPrice > product.price;
   const images = product.images?.length > 0 ? product.images : [{ url: 'https://images.unsplash.com/photo-1523381235312-3a1683935450?q=80&w=2070&auto=format&fit=crop' }];
 
+  const isVideoUrl = (url: string) => {
+    if (!url) return false;
+    const cleanUrl = url.split('?')[0].toLowerCase();
+    return cleanUrl.endsWith('.mp4');
+  };
+
+  const currentMedia = images[selectedImage] || images[0];
+  const isMainMediaVideo = currentMedia?.type === 'video' || isVideoUrl(currentMedia?.url);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Button variant="ghost" className="mb-6 gap-2" onClick={() => navigate(-1)}>
@@ -216,25 +225,60 @@ export default function ProductPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
         <div className="space-y-4">
-          <div className="aspect-[4/5] overflow-hidden rounded-3xl bg-surface-elevated">
-            <img 
-              src={images[selectedImage]?.url} 
-              alt={product.name} 
-              className="h-full w-full object-cover"
-            />
+          <div className="aspect-[4/5] overflow-hidden rounded-3xl bg-surface-elevated relative flex items-center justify-center">
+            {isMainMediaVideo ? (
+              <video 
+                src={currentMedia?.url} 
+                className="h-full w-full object-cover" 
+                controls 
+                autoPlay 
+                muted 
+                loop 
+                playsInline 
+                key={currentMedia?.url}
+              />
+            ) : (
+              <img 
+                src={currentMedia?.url} 
+                alt={product.name} 
+                className="h-full w-full object-cover"
+              />
+            )}
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            {images.slice(0, 3).map((img: any, index: number) => (
-              <button 
-                key={index}
-                onClick={() => setSelectedImage(index)}
-                className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                  selectedImage === index ? 'border-ocean' : 'border-transparent'
-                }`}
-              >
-                <img src={img.url} className="h-full w-full object-cover" alt={`${product.name} ${index + 1}`} />
-              </button>
-            ))}
+          <div className="grid grid-cols-5 gap-3">
+            {images.map((img: any, index: number) => {
+              const isThumbVideo = img.type === 'video' || isVideoUrl(img.url);
+              return (
+                <button 
+                  key={index}
+                  onClick={() => setSelectedImage(index)}
+                  className={`aspect-square rounded-xl overflow-hidden border-2 transition-all relative ${
+                    selectedImage === index ? 'border-ocean' : 'border-transparent'
+                  }`}
+                >
+                  {isThumbVideo ? (
+                    <div className="h-full w-full bg-black relative flex items-center justify-center">
+                      <video 
+                        src={img.url} 
+                        className="h-full w-full object-cover" 
+                        muted 
+                        loop 
+                        playsInline 
+                      />
+                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                        <span className="p-1.5 bg-white/90 rounded-full text-slate-800 shadow">
+                          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <img src={img.url} className="h-full w-full object-cover" alt={`${product.name} ${index + 1}`} />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
