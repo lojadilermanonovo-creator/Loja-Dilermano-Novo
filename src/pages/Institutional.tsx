@@ -2,6 +2,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { HelpCircle, ShieldCheck, FileText, RotateCcw, ArrowLeft, MessageSquare } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { useStoreWhatsapp } from '@/src/hooks/useStoreWhatsapp';
 
 interface InstitutionalPageProps {
   type: 'faq' | 'privacy' | 'terms' | 'refunds';
@@ -9,6 +10,7 @@ interface InstitutionalPageProps {
 
 export default function InstitutionalPage({ type }: InstitutionalPageProps) {
   const location = useLocation();
+  const whatsapp = useStoreWhatsapp();
 
   const menuItems = [
     {
@@ -119,7 +121,7 @@ export default function InstitutionalPage({ type }: InstitutionalPageProps) {
                 Ainda tem dúvidas? Fale diretamente com nossa equipe de suporte pelo WhatsApp.
               </p>
               <a
-                href="https://wa.me/5591983997964"
+                href={`https://wa.me/${whatsapp}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-xl flex items-center justify-center gap-2 transition-transform duration-200 text-xs uppercase"

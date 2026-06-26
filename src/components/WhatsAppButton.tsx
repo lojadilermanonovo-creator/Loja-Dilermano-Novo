@@ -1,8 +1,9 @@
 import { MessageCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useStoreWhatsapp } from '@/src/hooks/useStoreWhatsapp';
 
 export default function WhatsAppButton() {
-  const phoneNumber = "5591983997964"; // 91 98399-7964 formatted for WhatsApp
+  const phoneNumber = useStoreWhatsapp();
   const message = encodeURIComponent("Olá! Vim pelo site e gostaria de saber mais sobre os produtos.");
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
 

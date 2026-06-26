@@ -12,6 +12,7 @@ import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw, MapPin, Truck, AlertCircle, Tag, MessageCircle, Plus } from 'lucide-react';
 import { calculateShippingMock } from '@/src/utils/shipping';
+import { useStoreWhatsapp } from '@/src/hooks/useStoreWhatsapp';
 
 interface SavedAddress {
   id: string;
@@ -175,25 +176,9 @@ export default function CheckoutPage() {
   // Shipping dynamic states
   const [shippingOptions, setShippingOptions] = useState<any[]>([]);
   const [selectedShippingOption, setSelectedShippingOption] = useState<any | null>(null);
+  const [negotiatedShippingPrice, setNegotiatedShippingPrice] = useState<number>(0);
   const [calculatingShipping, setCalculatingShipping] = useState(false);
-  const [storeWhatsapp, setStoreWhatsapp] = useState<string>('');
-
-  useEffect(() => {
-    const fetchStoreWhatsapp = async () => {
-      try {
-        const settingsSnap = await getDoc(doc(db, 'settings', 'general'));
-        if (settingsSnap.exists()) {
-          const data = settingsSnap.data();
-          if (data.whatsapp) {
-            setStoreWhatsapp(data.whatsapp);
-          }
-        }
-      } catch (err) {
-        console.error("Erro ao buscar WhatsApp em settings/general:", err);
-      }
-    };
-    fetchStoreWhatsapp();
-  }, []);
+  const storeWhatsapp = useStoreWhatsapp();
 
   // Monitor Zip Code pattern (8 digits) to calculate shipping
   useEffect(() => {
@@ -277,7 +262,9 @@ export default function CheckoutPage() {
         }
       }
 
-      const shippingCost = selectedShippingOption ? selectedShippingOption.price : 0;
+      const shippingCost = selectedShippingOption 
+        ? (selectedShippingOption.id === 'negotiated' ? negotiatedShippingPrice : selectedShippingOption.price) 
+        : 0;
       const totalAmount = Math.max(subtotal - discountAmount, 0) + shippingCost;
 
       const orderData: any = {
@@ -367,7 +354,9 @@ export default function CheckoutPage() {
     }
   };
 
-  const selectedShippingPrice = selectedShippingOption ? selectedShippingOption.price : 0;
+  const selectedShippingPrice = selectedShippingOption 
+    ? (selectedShippingOption.id === 'negotiated' ? negotiatedShippingPrice : selectedShippingOption.price) 
+    : 0;
   const finalTotalAmount = Math.max(subtotal - discountAmount, 0) + selectedShippingPrice;
 
   return (
@@ -610,7 +599,7 @@ export default function CheckoutPage() {
                             </div>
                           </div>
                           <span className="text-xs font-extrabold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(opt.price)}
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(opt.id === 'negotiated' ? negotiatedShippingPrice : opt.price)}
                           </span>
                         </div>
                       );
@@ -619,15 +608,38 @@ export default function CheckoutPage() {
 
                   {/* Negotiation block */}
                   {selectedShippingOption?.id === 'negotiated' && (
-                    <div className="mt-4 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3 animate-in fade-in-50 duration-200">
+                    <div className="mt-4 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-4 animate-in fade-in-50 duration-200">
                       <h4 className="text-sm font-extrabold text-emerald-800 flex items-center gap-1.5 uppercase tracking-wider">
                         <MessageCircle className="h-4 w-4 text-emerald-600 shrink-0" /> Negociar Frete
                       </h4>
                       <p className="text-xs text-emerald-700 font-semibold leading-relaxed">
-                        Entre em contato pelo WhatsApp para combinar o valor do frete.
+                        Entre em contato pelo WhatsApp para combinar o valor do frete e digite o valor acordado no campo abaixo:
                       </p>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="negotiatedPriceInput" className="text-[11px] font-bold text-emerald-800">
+                          Valor do Frete Negociado (R$) *
+                        </Label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-emerald-600">R$</span>
+                          <Input
+                            id="negotiatedPriceInput"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0,00"
+                            value={negotiatedShippingPrice === 0 ? '' : negotiatedShippingPrice}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              setNegotiatedShippingPrice(isNaN(val) ? 0 : val);
+                            }}
+                            className="pl-10 bg-white border-emerald-200 rounded-xl focus:border-emerald-500 focus:ring-emerald-500 h-11 text-sm font-bold text-emerald-900"
+                          />
+                        </div>
+                      </div>
+
                       <a
-                        href={`https://wa.me/${(storeWhatsapp || "5591983997964").replace(/\D/g, '')}?text=${encodeURIComponent("Olá! Gostaria de negociar o frete do meu pedido.")}`}
+                        href={`https://wa.me/${storeWhatsapp}?text=${encodeURIComponent("Olá! Gostaria de negociar o frete do meu pedido.")}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 rounded-xl flex items-center justify-center gap-2 transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99] text-xs uppercase"

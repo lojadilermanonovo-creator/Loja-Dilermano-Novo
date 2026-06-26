@@ -24,10 +24,6 @@ interface PopupData {
   btnTextColor?: string;
 }
 
-// In-memory module state to avoid reopening on client-side route transitions
-let hasShownPromoPopupInThisLoad = false;
-let isScheduledInThisRun = false;
-
 export default function PromoPopup() {
   const [popup, setPopup] = useState<PopupData | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -57,40 +53,38 @@ export default function PromoPopup() {
       return;
     }
 
-    // 1. Check if already shown or dismissed in current page load session (prevents showing multiple times in the same session)
-    if (hasShownPromoPopupInThisLoad) {
+    // Build a unique fingerprint based on the popup content and settings.
+    // This allows the popup to "reset" and show again to users when the admin changes the content!
+    const fingerprint = encodeURIComponent(
+      `${popup.title || ''}_${popup.text || ''}_${popup.imageUrl || ''}_${popup.active}`
+    );
+    const sessionKey = `dilermano_popup_session_${fingerprint}`;
+    const localKey = `dilermano_popup_visitor_${fingerprint}`;
+
+    // 1. Check if already shown in the current browser tab session
+    const sessionShown = sessionStorage.getItem(sessionKey);
+    if (sessionShown === 'true') {
       return;
     }
 
-    // 2. Check local storage lock (if oncePerVisitor is enabled, prevent showing to the same visitor across sessions)
+    // 2. Check local storage if "oncePerVisitor" is active
     if (popup.oncePerVisitor) {
-      const visitorDismissed = localStorage.getItem('dilermano_popup_visitor_dismissed');
+      const visitorDismissed = localStorage.getItem(localKey);
       if (visitorDismissed === 'true') {
         return;
       }
-    } else {
-      // If oncePerVisitor is disabled, we clean up any old visitor dismiss local storage
-      // so that if they later disable it, it doesn't accidentally block them.
-      localStorage.removeItem('dilermano_popup_visitor_dismissed');
     }
 
-    // 3. Avoid setting multiple simultaneous timeouts
-    if (isScheduledInThisRun) {
-      return;
-    }
-
-    // Delay trigger
+    // Delay trigger using specified seconds or 5 seconds fallback
     const delayMs = (popup.delaySeconds || 5) * 1000;
-    isScheduledInThisRun = true;
     const timer = setTimeout(() => {
       setIsOpen(true);
-      // Mark as shown in this session immediately when it opens
-      hasShownPromoPopupInThisLoad = true;
+      // Mark as shown in this tab session
+      sessionStorage.setItem(sessionKey, 'true');
     }, delayMs);
 
     return () => {
       clearTimeout(timer);
-      isScheduledInThisRun = false;
     };
   }, [popup]);
 
@@ -115,11 +109,20 @@ export default function PromoPopup() {
 
   const handleClose = () => {
     setIsOpen(false);
-    hasShownPromoPopupInThisLoad = true;
-    
-    // Persist as visitor if set
-    if (popup?.oncePerVisitor) {
-      localStorage.setItem('dilermano_popup_visitor_dismissed', 'true');
+    if (!popup) return;
+
+    const fingerprint = encodeURIComponent(
+      `${popup.title || ''}_${popup.text || ''}_${popup.imageUrl || ''}_${popup.active}`
+    );
+    const sessionKey = `dilermano_popup_session_${fingerprint}`;
+    const localKey = `dilermano_popup_visitor_${fingerprint}`;
+
+    // Mark as shown in session
+    sessionStorage.setItem(sessionKey, 'true');
+
+    // Persist to localStorage if set to display once per visitor
+    if (popup.oncePerVisitor) {
+      localStorage.setItem(localKey, 'true');
     }
   };
 
@@ -127,14 +130,12 @@ export default function PromoPopup() {
     if (!destination) return;
 
     if (actionType === 'whatsapp') {
-      // Clean phone number
       const cleanPhone = destination.replace(/\D/g, '');
       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent('Olá! Vi o anúncio no site e gostaria de saber mais.')}`;
       window.open(waUrl, '_blank', 'noopener,noreferrer');
     } else if (actionType === 'email') {
       window.location.href = `mailto:${destination}`;
     } else {
-      // Custom link
       if (destination.startsWith('http://') || destination.startsWith('https://') || destination.startsWith('/')) {
         window.open(destination, destination.startsWith('/') ? '_self' : '_blank', 'noopener,noreferrer');
       } else {
@@ -146,6 +147,18 @@ export default function PromoPopup() {
   const handleActionClick = () => {
     if (!popup) return;
 
+    const fingerprint = encodeURIComponent(
+      `${popup.title || ''}_${popup.text || ''}_${popup.imageUrl || ''}_${popup.active}`
+    );
+    const sessionKey = `dilermano_popup_session_${fingerprint}`;
+    const localKey = `dilermano_popup_visitor_${fingerprint}`;
+
+    // Mark as shown and dismissed
+    sessionStorage.setItem(sessionKey, 'true');
+    if (popup.oncePerVisitor) {
+      localStorage.setItem(localKey, 'true');
+    }
+
     // Check if login is required first
     if (!user) {
       // Save pending action
@@ -156,7 +169,7 @@ export default function PromoPopup() {
       sessionStorage.setItem('dilermano_pending_popup_action', JSON.stringify(pendingAction));
 
       // Dismiss popup
-      handleClose();
+      setIsOpen(false);
 
       // Redirect to login
       const currentPath = encodeURIComponent(location.pathname + location.search);
@@ -165,7 +178,7 @@ export default function PromoPopup() {
     }
 
     // User is logged in, execute action normally
-    handleClose();
+    setIsOpen(false);
     executeAction(popup.buttonAction, popup.buttonDestination);
   };
 
@@ -182,7 +195,6 @@ export default function PromoPopup() {
     }
   };
 
-  // Extract styles or fallbacks
   const isVertical = popup.layout === 'vertical';
   const customBgColor = popup.bgColor || '#FFFFFF';
   const customTitleColor = popup.titleColor || '#0F172A';
