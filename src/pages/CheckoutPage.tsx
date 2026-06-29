@@ -10,7 +10,7 @@ import { db, functions } from '@/src/integrations/firebase/client';
 import { collection, addDoc, serverTimestamp, runTransaction, doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, MapPin, Truck, AlertCircle, Tag, MessageCircle, Plus } from 'lucide-react';
+import { RefreshCw, MapPin, Truck, AlertCircle, Tag, MessageCircle, Plus, CreditCard, QrCode } from 'lucide-react';
 import { calculateShippingMock } from '@/src/utils/shipping';
 import { useStoreWhatsapp } from '@/src/hooks/useStoreWhatsapp';
 
@@ -180,6 +180,31 @@ export default function CheckoutPage() {
   const [calculatingShipping, setCalculatingShipping] = useState(false);
   const storeWhatsapp = useStoreWhatsapp();
 
+  // Payment states
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'stripe'>('pix');
+  const [stripeConfig, setStripeConfig] = useState<{ active: boolean; publishableKey: string; mode: string } | null>(null);
+
+  // Fetch Stripe Config
+  useEffect(() => {
+    const fetchStripeConfig = async () => {
+      try {
+        const res = await fetch('/api/stripe/config');
+        if (res.ok) {
+          const data = await res.json();
+          setStripeConfig(data);
+          if (data.active) {
+            setPaymentMethod('stripe');
+          } else {
+            setPaymentMethod('pix');
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching Stripe configuration:', err);
+      }
+    };
+    fetchStripeConfig();
+  }, []);
+
   // Monitor Zip Code pattern (8 digits) to calculate shipping
   useEffect(() => {
     const cleanZip = address.zipCode.replace(/\D/g, '');
@@ -293,6 +318,7 @@ export default function CheckoutPage() {
         },
         status: 'pending',
         paymentStatus: 'pending',
+        paymentMethod: paymentMethod,
         createdAt: serverTimestamp(),
         orderNumber: `DI-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000)}`
       };
@@ -341,10 +367,28 @@ export default function CheckoutPage() {
         orderId = docRef.id;
       }
       
-      toast.success('Pedido criado com sucesso! Siga as instruções de pagamento.');
-      
-      clearCart();
-      navigate(`/checkout/success?orderId=${orderId}`);
+      if (paymentMethod === 'stripe') {
+        toast.info('Iniciando pagamento seguro do Stripe...');
+        const response = await fetch('/api/stripe/create-checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ orderId }),
+        });
+        const sessionData = await response.json();
+        if (response.ok && sessionData.url) {
+          clearCart();
+          window.location.href = sessionData.url;
+          return;
+        } else {
+          throw new Error(sessionData.error || 'Erro ao criar sessão de pagamento no Stripe.');
+        }
+      } else {
+        toast.success('Pedido criado com sucesso! Siga as instruções de pagamento.');
+        clearCart();
+        navigate(`/checkout/success?orderId=${orderId}`);
+      }
 
     } catch (error: any) {
       console.error('Erro no checkout:', error);
@@ -659,6 +703,64 @@ export default function CheckoutPage() {
               )}
             </div>
           </section>
+
+          {/* Método de Pagamento */}
+          {stripeConfig?.active && (
+            <section className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                  <CreditCard className="h-5 w-5 text-blue-600" /> Método de Pagamento
+                </h3>
+                <p className="text-slate-500 text-xs mt-1">
+                  Escolha como prefere realizar o pagamento do seu pedido.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Stripe Option */}
+                <div
+                  onClick={() => setPaymentMethod('stripe')}
+                  className={`p-5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-4 ${
+                    paymentMethod === 'stripe'
+                      ? 'border-blue-600 bg-blue-50/20 ring-2 ring-blue-100 shadow-sm'
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <div className={`p-2.5 rounded-xl border ${paymentMethod === 'stripe' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-500 border-slate-250'}`}>
+                    <CreditCard className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-black uppercase text-blue-600 tracking-wider">Cartão de Crédito</span>
+                    <span className="text-sm font-extrabold text-slate-800 block mt-0.5">Pagar via Stripe</span>
+                    <span className="text-[11px] text-slate-500 leading-normal block mt-1">
+                      Pague via Stripe Checkout seguro. Confirmação instantânea!
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pix Option */}
+                <div
+                  onClick={() => setPaymentMethod('pix')}
+                  className={`p-5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-4 ${
+                    paymentMethod === 'pix'
+                      ? 'border-blue-600 bg-blue-50/20 ring-2 ring-blue-100 shadow-sm'
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <div className={`p-2.5 rounded-xl border ${paymentMethod === 'pix' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-500 border-slate-250'}`}>
+                    <QrCode className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-black uppercase text-blue-600 tracking-wider">PIX Direto</span>
+                    <span className="text-sm font-extrabold text-slate-800 block mt-0.5">Chave Pix copia e cola</span>
+                    <span className="text-[11px] text-slate-500 leading-normal block mt-1">
+                      Pague via Pix copia e cola ou QR Code. Liberação rápida do pedido.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
 
         <div className="space-y-8">

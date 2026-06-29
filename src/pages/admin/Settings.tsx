@@ -11,7 +11,7 @@ import {
   Settings, Save, Phone, QrCode, MapPin, Store, 
   Globe, Key, RefreshCw, AlertCircle, CheckCircle2, Truck,
   Megaphone, Palette, Trash2, AlertTriangle, Download,
-  MessageSquare, Mail, Link2, Clock, Sparkles, Eye, X
+  MessageSquare, Mail, Link2, Clock, Sparkles, Eye, X, CreditCard
 } from 'lucide-react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import ImageUploader from '@/src/components/admin/ImageUploader';
@@ -24,7 +24,13 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'general' | 'melhorenvio' | 'popup' | 'footer'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'melhorenvio' | 'popup' | 'footer' | 'stripe'>('general');
+
+  // States for Stripe config
+  const [stripeActive, setStripeActive] = useState(false);
+  const [stripePublishableKey, setStripePublishableKey] = useState('');
+  const [stripeSecretKey, setStripeSecretKey] = useState('');
+  const [stripeMode, setStripeMode] = useState<'sandbox' | 'production'>('sandbox');
 
   // States for general config
   const [storeName, setStoreName] = useState('Dilermano Store');
@@ -242,6 +248,21 @@ export default function AdminSettings() {
         setPopupBtnBgColor('#2563EB');
         setPopupBtnTextColor('#FFFFFF');
       }
+
+      // 6. Stripe Settings
+      const stripeSnap = await getDoc(doc(db, 'settings', 'stripe'));
+      if (stripeSnap.exists()) {
+        const data = stripeSnap.data();
+        setStripeActive(data.active !== undefined ? data.active : false);
+        setStripePublishableKey(data.publishableKey || '');
+        setStripeSecretKey(data.secretKey || '');
+        setStripeMode(data.mode || 'sandbox');
+      } else {
+        setStripeActive(false);
+        setStripePublishableKey('');
+        setStripeSecretKey('');
+        setStripeMode('sandbox');
+      }
     } catch (e) {
       console.error(e);
       toast.error('Erro ao buscar as configurações do sistema');
@@ -334,6 +355,25 @@ export default function AdminSettings() {
     } catch (e) {
       console.error(e);
       toast.error('Erro ao salvar as configurações do Popup');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveStripe = async () => {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, 'settings', 'stripe'), {
+        active: stripeActive,
+        publishableKey: stripePublishableKey.trim(),
+        secretKey: stripeSecretKey.trim(),
+        mode: stripeMode,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success('Configurações do Stripe salvas com sucesso!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao salvar as configurações do Stripe');
     } finally {
       setSaving(false);
     }
@@ -590,6 +630,16 @@ export default function AdminSettings() {
           }`}
         >
           Rodapé (Footer)
+        </button>
+        <button
+          onClick={() => setActiveTab('stripe')}
+          className={`pb-3 text-sm font-extrabold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
+            activeTab === 'stripe'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Pagamentos (Stripe)
         </button>
       </div>
 
@@ -1587,6 +1637,129 @@ export default function AdminSettings() {
                   disabled={saving}
                 >
                   <Save className="h-4 w-4" /> {saving ? 'Salvando...' : 'Salvar Alterações do Rodapé'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'stripe' && (
+            <div className="space-y-6 animate-fade-in">
+              <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50 border-b p-6">
+                  <CardTitle className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-blue-500" /> Configuração do Stripe Checkout
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-500 mt-1">
+                    Configure as credenciais e o ambiente de pagamento do Stripe para aceitar Cartão de Crédito de forma transparente.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Active Switch */}
+                    <div className="space-y-2">
+                      <Label htmlFor="stripe-active" className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase">
+                        Ativar Stripe
+                      </Label>
+                      <select
+                        id="stripe-active"
+                        value={stripeActive ? 'true' : 'false'}
+                        onChange={(e) => setStripeActive(e.target.value === 'true')}
+                        className="w-full rounded-xl border border-slate-200 h-10 px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                      >
+                        <option value="false">Não (Inativo)</option>
+                        <option value="true">Sim (Ativo)</option>
+                      </select>
+                      <p className="text-[11px] text-slate-400">
+                        Se ativado, os clientes poderão escolher "Cartão de Crédito (Stripe)" no Checkout.
+                      </p>
+                    </div>
+
+                    {/* Environment Select */}
+                    <div className="space-y-2">
+                      <Label htmlFor="stripe-mode" className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase">
+                        <Globe className="h-3.5 w-3.5 text-slate-400" /> Ambiente
+                      </Label>
+                      <select
+                        id="stripe-mode"
+                        value={stripeMode}
+                        onChange={(e) => setStripeMode(e.target.value as 'sandbox' | 'production')}
+                        className="w-full rounded-xl border border-slate-200 h-10 px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                      >
+                        <option value="sandbox">Sandbox / Teste</option>
+                        <option value="production">Produção (Operação Real)</option>
+                      </select>
+                      <p className="text-[11px] text-slate-400">
+                        Sandbox para simulações e homologação. Produção para transações de cartão reais.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-slate-100">
+                    {/* Publishable Key */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="stripe-pk" className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase">
+                        <Key className="h-3.5 w-3.5 text-slate-400" /> Stripe Publishable Key (Chave Pública)
+                      </Label>
+                      <Input
+                        id="stripe-pk"
+                        type="text"
+                        value={stripePublishableKey}
+                        onChange={(e) => setStripePublishableKey(e.target.value)}
+                        placeholder="Ex: pk_test_..."
+                        className="h-10 bg-white text-sm font-mono"
+                      />
+                      <p className="text-[11px] text-slate-400">
+                        Utilizada no front-end para inicializar o Stripe Elements ou redirecionamentos (geralmente começa com pk_test_ ou pk_live_).
+                      </p>
+                    </div>
+
+                    {/* Secret Key */}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="stripe-sk" className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase">
+                        <Key className="h-3.5 w-3.5 text-slate-400" /> Stripe Secret Key (Chave Privada / Secreta)
+                      </Label>
+                      <Input
+                        id="stripe-sk"
+                        type="password"
+                        value={stripeSecretKey}
+                        onChange={(e) => setStripeSecretKey(e.target.value)}
+                        placeholder="Ex: sk_test_..."
+                        className="h-10 bg-white text-sm font-mono"
+                      />
+                      <p className="text-[11px] text-slate-400">
+                        Utilizada exclusivamente no back-end para criar sessões de checkout de forma segura (geralmente começa com sk_test_ ou sk_live_).
+                      </p>
+                    </div>
+                  </div>
+
+                  {stripeActive && (
+                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-150 flex gap-2.5 items-start mt-4">
+                      <AlertCircle className="h-4.5 w-4.5 text-blue-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <h5 className="text-xs font-bold text-blue-900 uppercase tracking-wider">Webhook de Confirmação Automatizada</h5>
+                        <p className="text-[11px] leading-relaxed text-blue-700">
+                          Para a baixa de estoque e o status de pagamento do pedido funcionarem de forma 100% garantida, adicione a seguinte URL de Webhook no painel do Stripe em <strong>Desenvolvedores &gt; Webhooks</strong>:
+                        </p>
+                        <code className="block bg-white p-2 rounded-lg border border-blue-200 text-[10px] font-mono select-all text-blue-800 break-all mt-1">
+                          {window.location.origin}/api/stripe/webhook
+                        </code>
+                        <p className="text-[11px] text-blue-700 font-semibold mt-1">
+                          Selecione o evento: <code className="bg-white px-1.5 py-0.5 rounded border text-[10px]">checkout.session.completed</code>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Form Save Bar */}
+              <div className="flex justify-end pt-4">
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl gap-2 h-11 px-8 cursor-pointer shadow-lg shadow-blue-500/10"
+                  onClick={handleSaveStripe}
+                  disabled={saving}
+                >
+                  <Save className="h-4 w-4" /> {saving ? 'Salvando...' : 'Salvar Alterações de Pagamento'}
                 </Button>
               </div>
             </div>

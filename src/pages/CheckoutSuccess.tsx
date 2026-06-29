@@ -93,7 +93,6 @@ export default function CheckoutSuccess() {
       <p className="text-base text-muted-foreground mb-6">
         Obrigado por comprar na Dilermano. Seu pedido já foi registrado em nossa base e aguarda a transferência de pagamento.
       </p>
-
       {orderId && (
         <div className="w-full flex flex-col gap-1 p-4 bg-surface-elevated rounded-2xl border mb-6 text-center font-mono text-xs">
           <div>ID do Pedido: <span className="font-bold text-slate-900">{orderId}</span></div>
@@ -105,72 +104,91 @@ export default function CheckoutSuccess() {
         </div>
       )}
 
-      <div className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] p-6 mb-8 text-left space-y-5">
-        <div className="flex items-center gap-2 border-b pb-3 mb-1">
-          <QrCode className="h-5 w-5 text-ocean" />
-          <h2 className="text-sm font-extrabold uppercase tracking-widest text-slate-700">Instruções para Pagamento via PIX</h2>
+      {order && order.paymentMethod === 'stripe' ? (
+        <div className="w-full bg-blue-50 border border-blue-200 rounded-[2rem] p-8 mb-8 text-left space-y-4 animate-in fade-in-50 duration-200">
+          <div className="flex items-center gap-2 border-b border-blue-150 pb-4 mb-1">
+            <CheckCircle className="h-5 w-5 text-blue-600" />
+            <h2 className="text-sm font-extrabold uppercase tracking-widest text-blue-800">Pagamento Confirmado via Stripe</h2>
+          </div>
+          <p className="text-xs text-blue-700 font-semibold leading-relaxed">
+            Seu pagamento foi processado e confirmado com sucesso através do nosso provedor seguro Stripe! O status do seu pedido foi atualizado para <strong>Pago</strong> e os produtos do seu estoque já foram baixados automaticamente.
+          </p>
+          <p className="text-xs text-blue-700 leading-relaxed">
+            Nossa equipe foi notificada e já iniciou o processo de separação e preparação para o envio. Você receberá atualizações de rastreamento no seu e-mail e na seção <strong>"Meus Pedidos"</strong>.
+          </p>
+          <div className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mt-2 pt-2 border-t border-blue-150 flex items-center gap-1">
+            <span>Método: Cartão de Crédito</span>
+            {order.stripeSessionId && <span className="font-mono text-[9px] lowercase opacity-75">(Sessão: {order.stripeSessionId.slice(0, 16)}...)</span>}
+          </div>
         </div>
-
-        <p className="text-xs text-slate-600 leading-relaxed">
-          Para concluir sua compra, faça a transferência do valor total do pedido utilizando o QR Code ou copiando a chave PIX informada abaixo. Após o pagamento, o sistema processará seu pedido para envio.
-        </p>
-
-        {pixQrCodeUrl ? (
-          <div className="flex flex-col items-center gap-2 py-4 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-sm mx-auto w-full">
-            <img 
-              src={pixQrCodeUrl} 
-              className="w-48 h-48 rounded-xl object-contain" 
-              alt="Custom PIX QR Code" 
-              referrerPolicy="no-referrer"
-            />
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Aponte a câmera do banco no QR Code</span>
+      ) : (
+        <div className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] p-6 mb-8 text-left space-y-5 animate-in fade-in-50 duration-200">
+          <div className="flex items-center gap-2 border-b pb-3 mb-1">
+            <QrCode className="h-5 w-5 text-ocean" />
+            <h2 className="text-sm font-extrabold uppercase tracking-widest text-slate-700">Instruções para Pagamento via PIX</h2>
           </div>
-        ) : qrDataUrl ? (
-          <div className="flex flex-col items-center gap-2 py-4 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-sm mx-auto w-full">
-            <img 
-              src={qrDataUrl} 
-              className="w-48 h-48 rounded-xl object-contain" 
-              alt="PIX QR Code" 
-            />
-            <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Aponte a câmera do banco no QR Code</span>
-          </div>
-        ) : pixKey ? (
-          <div className="p-6 rounded-2xl bg-white border border-slate-100 shadow-sm max-w-sm mx-auto w-full text-center text-xs font-semibold text-slate-500">
-            Gerando QR Code local...
-          </div>
-        ) : null}
 
-        {pixKey ? (
-          <div className="space-y-1.5">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Chave PIX Cadastrada</span>
-            <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-              <span className="text-xs font-mono font-bold text-slate-800 break-all flex-1">{pixKey}</span>
-              <Button 
-                onClick={handleCopyKey} 
-                variant="outline" 
-                size="sm" 
-                className="rounded-lg h-9 w-24 shrink-0 font-bold flex items-center justify-center gap-1 border-2 border-slate-200 cursor-pointer"
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Copiado</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Copiar</span>
-                  </>
-                )}
-              </Button>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Para concluir sua compra, faça a transferência do valor total do pedido utilizando o QR Code ou copiando a chave PIX informada abaixo. Após o pagamento, o sistema processará seu pedido para envio.
+          </p>
+
+          {pixQrCodeUrl ? (
+            <div className="flex flex-col items-center gap-2 py-4 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-sm mx-auto w-full">
+              <img 
+                src={pixQrCodeUrl} 
+                className="w-48 h-48 rounded-xl object-contain" 
+                alt="Custom PIX QR Code" 
+                referrerPolicy="no-referrer"
+              />
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Aponte a câmera do banco no QR Code</span>
             </div>
-          </div>
-        ) : (
-          <div className="p-3 bg-amber-50 text-amber-700 text-xs font-bold rounded-xl border border-amber-200">
-            A chave PIX de recebimento está sendo configurada no painel administrativo. Por favor, entre em contato se necessário.
-          </div>
-        )}
-      </div>
+          ) : qrDataUrl ? (
+            <div className="flex flex-col items-center gap-2 py-4 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-sm mx-auto w-full">
+              <img 
+                src={qrDataUrl} 
+                className="w-48 h-48 rounded-xl object-contain" 
+                alt="PIX QR Code" 
+              />
+              <span className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Aponte a câmera do banco no QR Code</span>
+            </div>
+          ) : pixKey ? (
+            <div className="p-6 rounded-2xl bg-white border border-slate-100 shadow-sm max-w-sm mx-auto w-full text-center text-xs font-semibold text-slate-500">
+              Gerando QR Code local...
+            </div>
+          ) : null}
+
+          {pixKey ? (
+            <div className="space-y-1.5">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Chave PIX Cadastrada</span>
+              <div className="flex items-center gap-2 bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+                <span className="text-xs font-mono font-bold text-slate-800 break-all flex-1">{pixKey}</span>
+                <Button 
+                  onClick={handleCopyKey} 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-lg h-9 w-24 shrink-0 font-bold flex items-center justify-center gap-1 border-2 border-slate-200 cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>Copiado</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Copiar</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-amber-50 text-amber-700 text-xs font-bold rounded-xl border border-amber-200">
+              A chave PIX de recebimento está sendo configurada no painel administrativo. Por favor, entre em contato se necessário.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
         <Link to="/meus-pedidos" className="flex-1 max-w-xs">
