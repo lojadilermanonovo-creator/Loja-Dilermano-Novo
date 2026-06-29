@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
@@ -11,8 +12,28 @@ const appAdmin = getApps().length === 0
   : getApp();
 const db = getFirestore(appAdmin, "ai-studio-1d17aef0-f9e2-48aa-bbba-ff95554e5700");
 
+// Load applet config for REST API fallbacks in development environment
+let appConfig: any = null;
+try {
+  appConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
+} catch (e) {
+  console.warn('[Stripe Server] Failed to load firebase-applet-config.json:', e);
+}
+
 const app = express();
 const PORT = 3000;
+
+// Simple CORS middleware to handle Netlify/external requests
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
 
 // Webhook route needs raw body for signature verification
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req: express.Request, res: express.Response) => {
@@ -229,6 +250,25 @@ app.get('/api/stripe/config', async (req, res) => {
         }
       } catch (err) {
         console.warn('[Stripe Server] Could not read settings/stripe_public from Firestore admin:', err);
+        // REST Fallback for local container environment
+        if (appConfig) {
+          try {
+            const url = `https://firestore.googleapis.com/v1/projects/${appConfig.projectId}/databases/${appConfig.firestoreDatabaseId}/documents/settings/stripe_public?key=${appConfig.apiKey}`;
+            const restRes = await fetch(url);
+            if (restRes.ok) {
+              const doc = await restRes.json();
+              const fields = doc.fields;
+              if (fields) {
+                active = fields.active?.booleanValue !== false;
+                publishableKey = fields.publishableKey?.stringValue || publishableKey;
+                mode = fields.mode?.stringValue || mode;
+                console.log('[Stripe Server] Successfully fetched settings/stripe_public via REST fallback');
+              }
+            }
+          } catch (restErr) {
+            console.warn('[Stripe Server] REST fallback for settings/stripe_public failed:', restErr);
+          }
+        }
       }
     }
 
@@ -395,10 +435,10 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
     });
 
     // 5. Update Order with stripeSessionId and stripePaymentMethod
-    await db.collection('orders').doc(orderId).update({
+    await db.collection('orders').doc(orderId).set({
       stripeSessionId: session.id,
       paymentMethod: 'stripe',
-    });
+    }, { merge: true });
 
     res.json({ url: session.url });
   } catch (error: any) {

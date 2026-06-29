@@ -6,6 +6,7 @@ admin.initializeApp();
 export { calculateShipping } from "./calculateShipping";
 export { exchangeMelhorEnvioCode } from "./exchangeMelhorEnvioCode";
 export { setAdminClaim } from "./setAdminClaim";
+export { stripe_config, stripe_checkout, stripe_webhook } from "./stripe";
 
 // Database Triggers
 export { onOrderCreated } from "./onOrderCreated";

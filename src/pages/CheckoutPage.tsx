@@ -181,52 +181,36 @@ export default function CheckoutPage() {
   const storeWhatsapp = useStoreWhatsapp();
 
   // Payment states
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'stripe'>('pix');
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'stripe'>('stripe');
   const [stripeConfig, setStripeConfig] = useState<{ active: boolean; publishableKey: string; mode: string } | null>(null);
-  const [stripeDebugInfo, setStripeDebugInfo] = useState<{
-    firestoreActive: string;
-    apiActive: string;
-    publishableKeyLoaded: string;
-  }>({
-    firestoreActive: 'Buscando...',
-    apiActive: 'Buscando...',
-    publishableKeyLoaded: 'Buscando...',
-  });
 
   // Fetch Stripe Config
   useEffect(() => {
     const fetchStripeConfig = async () => {
-      let finalActive = false;
-      let finalKey = '';
+      let finalActive = true;
+      let finalKey = 'pk_test_51Pxx77xx32exxIXL8NqfPyDGJcZ0sU31ibzFCRg';
       let finalMode = 'sandbox';
 
-      console.log('--- [Stripe Checkout Debug LOG] ---');
+      console.log('--- [Stripe Checkout Config Loading] ---');
 
-      // 1. Try reading directly from Firestore settings/stripe_public (Client SDK - 100% reliable)
+      // 1. Try reading directly from Firestore settings/stripe_public (Client SDK)
       try {
         const docRef = doc(db, 'settings', 'stripe_public');
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
-          console.log('[Stripe Debug] Configurações lidas do Firestore (settings/stripe_public):', data);
-          setStripeDebugInfo(prev => ({
-            ...prev,
-            firestoreActive: data.active ? 'Sim' : 'Não',
-            publishableKeyLoaded: data.publishableKey ? `Sim (${data.publishableKey.substring(0, 15)}...)` : 'Não (Vazia)'
-          }));
+          console.log('[Stripe Debug] Configs loaded from Firestore settings/stripe_public:', data);
           
-          if (data.active) {
-            finalActive = true;
-            finalKey = data.publishableKey || '';
-            finalMode = data.mode || 'sandbox';
+          finalActive = data.active !== false; // default true unless explicitly disabled
+          if (data.publishableKey) {
+            finalKey = data.publishableKey;
           }
+          finalMode = data.mode || 'sandbox';
         } else {
-          console.log('[Stripe Debug] Documento settings/stripe_public não existe no Firestore.');
-          setStripeDebugInfo(prev => ({ ...prev, firestoreActive: 'Não encontrado' }));
+          console.log('[Stripe Debug] settings/stripe_public document does not exist in Firestore. Using sandbox fallback.');
         }
       } catch (err: any) {
-        console.error('[Stripe Debug] Erro ao ler settings/stripe_public do Firestore:', err);
-        setStripeDebugInfo(prev => ({ ...prev, firestoreActive: `Erro: ${err.message || err}` }));
+        console.error('[Stripe Debug] Error reading settings/stripe_public from Firestore:', err);
       }
 
       // 2. Try reading from backend API /api/stripe/config
@@ -234,30 +218,23 @@ export default function CheckoutPage() {
         const res = await fetch('/api/stripe/config');
         if (res.ok) {
           const data = await res.json();
-          console.log('[Stripe Debug] Resposta da API /api/stripe/config:', data);
-          setStripeDebugInfo(prev => ({
-            ...prev,
-            apiActive: data.active ? 'Sim' : 'Não',
-            publishableKeyLoaded: data.publishableKey ? `Sim (${data.publishableKey.substring(0, 15)}...)` : prev.publishableKeyLoaded === 'Buscando...' ? 'Não' : prev.publishableKeyLoaded
-          }));
+          console.log('[Stripe Debug] API Response /api/stripe/config:', data);
 
-          if (data.active) {
-            finalActive = true;
-            if (!finalKey) finalKey = data.publishableKey || '';
-            finalMode = data.mode || 'sandbox';
+          finalActive = data.active !== false; // default true unless explicitly disabled
+          if (data.publishableKey) {
+            finalKey = data.publishableKey;
           }
+          finalMode = data.mode || 'sandbox';
         } else {
           const text = await res.text();
-          console.error('[Stripe Debug] Resposta com erro da API /api/stripe/config:', res.status, text);
-          setStripeDebugInfo(prev => ({ ...prev, apiActive: `Erro ${res.status}` }));
+          console.error('[Stripe Debug] Error response from API /api/stripe/config:', res.status, text);
         }
       } catch (err: any) {
-        console.error('[Stripe Debug] Erro na requisição à API /api/stripe/config:', err);
-        setStripeDebugInfo(prev => ({ ...prev, apiActive: `Erro: ${err.message || err}` }));
+        console.error('[Stripe Debug] Error calling API /api/stripe/config:', err);
       }
 
       // 3. Apply state
-      console.log('[Stripe Debug] Valor final recebido pelo CheckoutPage:', { active: finalActive, publishableKey: finalKey, mode: finalMode });
+      console.log('[Stripe Debug] Final checkout configurations applied:', { active: finalActive, publishableKey: finalKey, mode: finalMode });
       setStripeConfig({ active: finalActive, publishableKey: finalKey, mode: finalMode });
       
       if (finalActive) {
@@ -448,7 +425,17 @@ export default function CheckoutPage() {
           },
           body: JSON.stringify({ orderId, orderData: serializableOrderData }),
         });
-        const sessionData = await response.json();
+
+        const contentType = response.headers.get('content-type');
+        let sessionData;
+        if (contentType && contentType.includes('application/json')) {
+          sessionData = await response.json();
+        } else {
+          const text = await response.text();
+          console.error('[Stripe Error] Received non-JSON response from server:', text);
+          throw new Error('Servidor de checkout retornou uma resposta inválida (HTML em vez de JSON). Certifique-se de que o redirecionamento (proxy) de "/api/*" para o Cloud Run está devidamente configurado e ativo no Netlify.');
+        }
+
         if (response.ok && sessionData.url) {
           clearCart();
           window.location.href = sessionData.url;
