@@ -201,17 +201,48 @@ app.use(express.urlencoded({ extended: true }));
 // Retrieve public Stripe config
 app.get('/api/stripe/config', async (req, res) => {
   try {
-    const docSnap = await db.collection('settings').doc('stripe').get();
-    if (docSnap.exists) {
-      const data = docSnap.data()!;
-      res.json({
-        active: data.active === true,
-        publishableKey: data.publishableKey || '',
-        mode: data.mode || 'sandbox',
-      });
-    } else {
-      res.json({ active: false, publishableKey: '', mode: 'sandbox' });
+    let active = false;
+    let publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || '';
+    let mode = 'sandbox';
+
+    try {
+      const docSnap = await db.collection('settings').doc('stripe').get();
+      if (docSnap.exists) {
+        const data = docSnap.data()!;
+        active = data.active === true;
+        publishableKey = data.publishableKey || publishableKey;
+        mode = data.mode || mode;
+      }
+    } catch (err) {
+      console.warn('[Stripe Server] Could not read settings/stripe from Firestore admin:', err);
     }
+
+    // Fallback to settings/stripe_public if admin collection read failed
+    if (!active || !publishableKey) {
+      try {
+        const docSnapPublic = await db.collection('settings').doc('stripe_public').get();
+        if (docSnapPublic.exists) {
+          const data = docSnapPublic.data()!;
+          active = data.active === true;
+          publishableKey = data.publishableKey || publishableKey;
+          mode = data.mode || mode;
+        }
+      } catch (err) {
+        console.warn('[Stripe Server] Could not read settings/stripe_public from Firestore admin:', err);
+      }
+    }
+
+    // Also consider env variables
+    if (process.env.STRIPE_PUBLISHABLE_KEY && process.env.STRIPE_SECRET_KEY) {
+      active = true;
+      publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+    }
+
+    res.json({
+      active,
+      publishableKey,
+      mode,
+    });
   } catch (error: any) {
     console.error('Error fetching stripe config:', error);
     res.status(500).json({ error: error.message });
@@ -221,28 +252,72 @@ app.get('/api/stripe/config', async (req, res) => {
 // Create Stripe Checkout Session
 app.post('/api/stripe/create-checkout-session', async (req, res) => {
   try {
-    const { orderId } = req.body;
-    if (!orderId) {
-      res.status(400).json({ error: 'Order ID is required' });
+    const { orderId, orderData: clientOrderData } = req.body;
+    if (!orderId && !clientOrderData) {
+      res.status(400).json({ error: 'Order ID or Order Data is required' });
       return;
     }
 
-    // 1. Fetch Order details
-    const orderSnap = await db.collection('orders').doc(orderId).get();
-    if (!orderSnap.exists) {
-      res.status(404).json({ error: 'Order not found' });
+    let orderData = clientOrderData;
+
+    if (!orderData) {
+      try {
+        // 1. Fetch Order details
+        const orderSnap = await db.collection('orders').doc(orderId).get();
+        if (orderSnap.exists) {
+          orderData = orderSnap.data()!;
+        }
+      } catch (err) {
+        console.warn('[Stripe Server] Could not read order from Firestore admin SDK:', err);
+      }
+    }
+
+    if (!orderData) {
+      res.status(404).json({ error: 'Order details could not be retrieved. Please provide orderData in the request body.' });
       return;
     }
-    const orderData = orderSnap.data()!;
 
     // 2. Fetch Stripe settings
-    const stripeSnap = await db.collection('settings').doc('stripe').get();
-    if (!stripeSnap.exists || !stripeSnap.data()?.active) {
+    let secretKey = process.env.STRIPE_SECRET_KEY || '';
+    let stripeActive = false;
+
+    try {
+      const stripeSnap = await db.collection('settings').doc('stripe').get();
+      if (stripeSnap.exists) {
+        const stripeConfig = stripeSnap.data()!;
+        stripeActive = stripeConfig.active === true;
+        if (!secretKey) {
+          secretKey = stripeConfig.secretKey || '';
+        }
+      }
+    } catch (err) {
+      console.warn('[Stripe Server] Could not read settings/stripe from Firestore admin:', err);
+    }
+
+    // Fallback to settings/stripe_public if admin collection read failed
+    if (!stripeActive || !secretKey) {
+      try {
+        const stripeSnapPublic = await db.collection('settings').doc('stripe_public').get();
+        if (stripeSnapPublic.exists) {
+          const stripeConfigPublic = stripeSnapPublic.data()!;
+          stripeActive = stripeConfigPublic.active === true;
+        }
+      } catch (err) {
+        console.warn('[Stripe Server] Could not read settings/stripe_public from Firestore admin:', err);
+      }
+    }
+
+    // Also consider env variables
+    if (process.env.STRIPE_SECRET_KEY) {
+      stripeActive = true;
+      secretKey = process.env.STRIPE_SECRET_KEY;
+    }
+
+    if (!stripeActive) {
       res.status(400).json({ error: 'Stripe integration is disabled or not configured.' });
       return;
     }
-    const stripeConfig = stripeSnap.data()!;
-    const secretKey = stripeConfig.secretKey;
+
     if (!secretKey) {
       res.status(500).json({ error: 'Stripe configuration is missing the Secret Key.' });
       return;

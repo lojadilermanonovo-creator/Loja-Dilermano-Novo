@@ -2,22 +2,20 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 async function run() {
-  console.log("Initializing Firebase Admin...");
-  initializeApp({
-    projectId: "gen-lang-client-0387723123"
-  });
+  console.log("Initializing Firebase Admin with auto-discovery...");
+  initializeApp();
 
   const db = getFirestore("ai-studio-1d17aef0-f9e2-48aa-bbba-ff95554e5700");
 
-  console.log("--- AUDITING SETTINGS/PROMOCTA ---");
-  const promoSnap = await db.collection('settings').doc('promocta').get();
-  if (promoSnap.exists) {
-    const data = promoSnap.data()!;
-    console.log("promocta document data:", JSON.stringify(data, null, 2));
-    console.log("type of value field:", typeof data.value);
-    console.log("value field value:", data.value);
+  console.log("--- AUDITING SETTINGS/STRIPE ---");
+  const stripeSnap = await db.collection('settings').doc('stripe').get();
+  if (stripeSnap.exists) {
+    const data = stripeSnap.data()!;
+    console.log("stripe document data:", JSON.stringify(data, null, 2));
+    console.log("type of active field:", typeof data.active);
+    console.log("active field value:", data.active);
   } else {
-    console.log("settings/promocta does not exist!");
+    console.log("settings/stripe does not exist!");
   }
 
   console.log("\n--- AUDITING CATEGORIES ---");

@@ -370,6 +370,14 @@ export default function AdminSettings() {
         mode: stripeMode,
         updatedAt: serverTimestamp(),
       });
+      
+      await setDoc(doc(db, 'settings', 'stripe_public'), {
+        active: stripeActive,
+        publishableKey: stripePublishableKey.trim(),
+        mode: stripeMode,
+        updatedAt: serverTimestamp(),
+      });
+      
       toast.success('Configurações do Stripe salvas com sucesso!');
     } catch (e) {
       console.error(e);

@@ -183,25 +183,90 @@ export default function CheckoutPage() {
   // Payment states
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'stripe'>('pix');
   const [stripeConfig, setStripeConfig] = useState<{ active: boolean; publishableKey: string; mode: string } | null>(null);
+  const [stripeDebugInfo, setStripeDebugInfo] = useState<{
+    firestoreActive: string;
+    apiActive: string;
+    publishableKeyLoaded: string;
+  }>({
+    firestoreActive: 'Buscando...',
+    apiActive: 'Buscando...',
+    publishableKeyLoaded: 'Buscando...',
+  });
 
   // Fetch Stripe Config
   useEffect(() => {
     const fetchStripeConfig = async () => {
+      let finalActive = false;
+      let finalKey = '';
+      let finalMode = 'sandbox';
+
+      console.log('--- [Stripe Checkout Debug LOG] ---');
+
+      // 1. Try reading directly from Firestore settings/stripe_public (Client SDK - 100% reliable)
+      try {
+        const docRef = doc(db, 'settings', 'stripe_public');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          console.log('[Stripe Debug] Configurações lidas do Firestore (settings/stripe_public):', data);
+          setStripeDebugInfo(prev => ({
+            ...prev,
+            firestoreActive: data.active ? 'Sim' : 'Não',
+            publishableKeyLoaded: data.publishableKey ? `Sim (${data.publishableKey.substring(0, 15)}...)` : 'Não (Vazia)'
+          }));
+          
+          if (data.active) {
+            finalActive = true;
+            finalKey = data.publishableKey || '';
+            finalMode = data.mode || 'sandbox';
+          }
+        } else {
+          console.log('[Stripe Debug] Documento settings/stripe_public não existe no Firestore.');
+          setStripeDebugInfo(prev => ({ ...prev, firestoreActive: 'Não encontrado' }));
+        }
+      } catch (err: any) {
+        console.error('[Stripe Debug] Erro ao ler settings/stripe_public do Firestore:', err);
+        setStripeDebugInfo(prev => ({ ...prev, firestoreActive: `Erro: ${err.message || err}` }));
+      }
+
+      // 2. Try reading from backend API /api/stripe/config
       try {
         const res = await fetch('/api/stripe/config');
         if (res.ok) {
           const data = await res.json();
-          setStripeConfig(data);
+          console.log('[Stripe Debug] Resposta da API /api/stripe/config:', data);
+          setStripeDebugInfo(prev => ({
+            ...prev,
+            apiActive: data.active ? 'Sim' : 'Não',
+            publishableKeyLoaded: data.publishableKey ? `Sim (${data.publishableKey.substring(0, 15)}...)` : prev.publishableKeyLoaded === 'Buscando...' ? 'Não' : prev.publishableKeyLoaded
+          }));
+
           if (data.active) {
-            setPaymentMethod('stripe');
-          } else {
-            setPaymentMethod('pix');
+            finalActive = true;
+            if (!finalKey) finalKey = data.publishableKey || '';
+            finalMode = data.mode || 'sandbox';
           }
+        } else {
+          const text = await res.text();
+          console.error('[Stripe Debug] Resposta com erro da API /api/stripe/config:', res.status, text);
+          setStripeDebugInfo(prev => ({ ...prev, apiActive: `Erro ${res.status}` }));
         }
-      } catch (err) {
-        console.error('Error fetching Stripe configuration:', err);
+      } catch (err: any) {
+        console.error('[Stripe Debug] Erro na requisição à API /api/stripe/config:', err);
+        setStripeDebugInfo(prev => ({ ...prev, apiActive: `Erro: ${err.message || err}` }));
+      }
+
+      // 3. Apply state
+      console.log('[Stripe Debug] Valor final recebido pelo CheckoutPage:', { active: finalActive, publishableKey: finalKey, mode: finalMode });
+      setStripeConfig({ active: finalActive, publishableKey: finalKey, mode: finalMode });
+      
+      if (finalActive) {
+        setPaymentMethod('stripe');
+      } else {
+        setPaymentMethod('pix');
       }
     };
+    
     fetchStripeConfig();
   }, []);
 
@@ -369,12 +434,19 @@ export default function CheckoutPage() {
       
       if (paymentMethod === 'stripe') {
         toast.info('Iniciando pagamento seguro do Stripe...');
+        
+        // Create a copy of orderData for JSON serialization (as serverTimestamp cannot be serialized)
+        const serializableOrderData = {
+          ...orderData,
+          createdAt: new Date().toISOString()
+        };
+
         const response = await fetch('/api/stripe/create-checkout-session', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ orderId }),
+          body: JSON.stringify({ orderId, orderData: serializableOrderData }),
         });
         const sessionData = await response.json();
         if (response.ok && sessionData.url) {
@@ -761,6 +833,18 @@ export default function CheckoutPage() {
               </div>
             </section>
           )}
+
+          {/* Debug Stripe Info (Temporary as requested by user) */}
+          <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-6 text-xs font-mono text-slate-600 space-y-2 mt-4 shadow-sm">
+            <div className="font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+              Diagnóstico Stripe (Temporário)
+            </div>
+            <div>Stripe Ativo (Firestore `stripe_public`): <span className={stripeDebugInfo.firestoreActive === 'Sim' ? 'text-green-600 font-bold' : 'text-rose-600'}>{stripeDebugInfo.firestoreActive}</span></div>
+            <div>Stripe Ativo (API `/api/stripe/config`): <span className={stripeDebugInfo.apiActive === 'Sim' ? 'text-green-600 font-bold' : 'text-rose-600'}>{stripeDebugInfo.apiActive}</span></div>
+            <div>Publishable Key carregada: <span className="font-semibold text-slate-700">{stripeDebugInfo.publishableKeyLoaded}</span></div>
+            <div className="text-[10px] text-slate-400 mt-2 leading-relaxed">Este painel é exibido temporariamente para identificar em qual etapa as credenciais Stripe estão sendo carregadas.</div>
+          </div>
         </div>
 
         <div className="space-y-8">
