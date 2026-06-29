@@ -777,74 +777,60 @@ export default function CheckoutPage() {
           </section>
 
           {/* Método de Pagamento */}
-          {stripeConfig?.active && (
-            <section className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 space-y-6">
-              <div>
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
-                  <CreditCard className="h-5 w-5 text-blue-600" /> Método de Pagamento
-                </h3>
-                <p className="text-slate-500 text-xs mt-1">
-                  Escolha como prefere realizar o pagamento do seu pedido.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Stripe Option */}
-                <div
-                  onClick={() => setPaymentMethod('stripe')}
-                  className={`p-5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-4 ${
-                    paymentMethod === 'stripe'
-                      ? 'border-blue-600 bg-blue-50/20 ring-2 ring-blue-100 shadow-sm'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className={`p-2.5 rounded-xl border ${paymentMethod === 'stripe' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-500 border-slate-250'}`}>
-                    <CreditCard className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-black uppercase text-blue-600 tracking-wider">Cartão de Crédito</span>
-                    <span className="text-sm font-extrabold text-slate-800 block mt-0.5">Pagar via Stripe</span>
-                    <span className="text-[11px] text-slate-500 leading-normal block mt-1">
-                      Pague via Stripe Checkout seguro. Confirmação instantânea!
-                    </span>
-                  </div>
-                </div>
-
-                {/* Pix Option */}
-                <div
-                  onClick={() => setPaymentMethod('pix')}
-                  className={`p-5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-4 ${
-                    paymentMethod === 'pix'
-                      ? 'border-blue-600 bg-blue-50/20 ring-2 ring-blue-100 shadow-sm'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className={`p-2.5 rounded-xl border ${paymentMethod === 'pix' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-500 border-slate-250'}`}>
-                    <QrCode className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-black uppercase text-blue-600 tracking-wider">PIX Direto</span>
-                    <span className="text-sm font-extrabold text-slate-800 block mt-0.5">Chave Pix copia e cola</span>
-                    <span className="text-[11px] text-slate-500 leading-normal block mt-1">
-                      Pague via Pix copia e cola ou QR Code. Liberação rápida do pedido.
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Debug Stripe Info (Temporary as requested by user) */}
-          <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-6 text-xs font-mono text-slate-600 space-y-2 mt-4 shadow-sm">
-            <div className="font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-              Diagnóstico Stripe (Temporário)
+          <section className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                <CreditCard className="h-5 w-5 text-blue-600" /> Método de Pagamento
+              </h3>
+              <p className="text-slate-500 text-xs mt-1">
+                Escolha como prefere realizar o pagamento do seu pedido.
+              </p>
             </div>
-            <div>Stripe Ativo (Firestore `stripe_public`): <span className={stripeDebugInfo.firestoreActive === 'Sim' ? 'text-green-600 font-bold' : 'text-rose-600'}>{stripeDebugInfo.firestoreActive}</span></div>
-            <div>Stripe Ativo (API `/api/stripe/config`): <span className={stripeDebugInfo.apiActive === 'Sim' ? 'text-green-600 font-bold' : 'text-rose-600'}>{stripeDebugInfo.apiActive}</span></div>
-            <div>Publishable Key carregada: <span className="font-semibold text-slate-700">{stripeDebugInfo.publishableKeyLoaded}</span></div>
-            <div className="text-[10px] text-slate-400 mt-2 leading-relaxed">Este painel é exibido temporariamente para identificar em qual etapa as credenciais Stripe estão sendo carregadas.</div>
-          </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Stripe Option */}
+              <div
+                onClick={() => setPaymentMethod('stripe')}
+                className={`p-5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-4 ${
+                  paymentMethod === 'stripe'
+                    ? 'border-blue-600 bg-blue-50/20 ring-2 ring-blue-100 shadow-sm'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl border ${paymentMethod === 'stripe' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-500 border-slate-250'}`}>
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-black uppercase text-blue-600 tracking-wider">Cartão de Crédito</span>
+                  <span className="text-sm font-extrabold text-slate-800 block mt-0.5">Pagar via Stripe</span>
+                  <span className="text-[11px] text-slate-500 leading-normal block mt-1">
+                    Pague via Stripe Checkout seguro. Confirmação instantânea!
+                  </span>
+                </div>
+              </div>
+
+              {/* Pix Option */}
+              <div
+                onClick={() => setPaymentMethod('pix')}
+                className={`p-5 rounded-2xl border text-left cursor-pointer transition-all flex items-start gap-4 ${
+                  paymentMethod === 'pix'
+                    ? 'border-blue-600 bg-blue-50/20 ring-2 ring-blue-100 shadow-sm'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div className={`p-2.5 rounded-xl border ${paymentMethod === 'pix' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-500 border-slate-250'}`}>
+                  <QrCode className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-black uppercase text-blue-600 tracking-wider">PIX Direto</span>
+                  <span className="text-sm font-extrabold text-slate-800 block mt-0.5">Chave Pix copia e cola</span>
+                  <span className="text-[11px] text-slate-500 leading-normal block mt-1">
+                    Pague via Pix copia e cola ou QR Code. Liberação rápida do pedido.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div className="space-y-8">

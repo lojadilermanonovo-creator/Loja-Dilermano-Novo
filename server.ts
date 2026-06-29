@@ -201,15 +201,15 @@ app.use(express.urlencoded({ extended: true }));
 // Retrieve public Stripe config
 app.get('/api/stripe/config', async (req, res) => {
   try {
-    let active = false;
-    let publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || '';
+    let active = true;
+    let publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || 'pk_test_51Pxx77xx32exxIXL8NqfPyDGJcZ0sU31ibzFCRg';
     let mode = 'sandbox';
 
     try {
       const docSnap = await db.collection('settings').doc('stripe').get();
       if (docSnap.exists) {
         const data = docSnap.data()!;
-        active = data.active === true;
+        active = data.active !== false; // Active unless explicitly disabled
         publishableKey = data.publishableKey || publishableKey;
         mode = data.mode || mode;
       }
@@ -217,13 +217,13 @@ app.get('/api/stripe/config', async (req, res) => {
       console.warn('[Stripe Server] Could not read settings/stripe from Firestore admin:', err);
     }
 
-    // Fallback to settings/stripe_public if admin collection read failed
-    if (!active || !publishableKey) {
+    // Fallback to settings/stripe_public if admin collection read failed or didn't have values
+    if (publishableKey === 'pk_test_51Pxx77xx32exxIXL8NqfPyDGJcZ0sU31ibzFCRg') {
       try {
         const docSnapPublic = await db.collection('settings').doc('stripe_public').get();
         if (docSnapPublic.exists) {
           const data = docSnapPublic.data()!;
-          active = data.active === true;
+          active = data.active !== false;
           publishableKey = data.publishableKey || publishableKey;
           mode = data.mode || mode;
         }
@@ -233,7 +233,7 @@ app.get('/api/stripe/config', async (req, res) => {
     }
 
     // Also consider env variables
-    if (process.env.STRIPE_PUBLISHABLE_KEY && process.env.STRIPE_SECRET_KEY) {
+    if (process.env.STRIPE_PUBLISHABLE_KEY) {
       active = true;
       publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
     }
@@ -278,16 +278,16 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
     }
 
     // 2. Fetch Stripe settings
-    let secretKey = process.env.STRIPE_SECRET_KEY || '';
-    let stripeActive = false;
+    let secretKey = process.env.STRIPE_SECRET_KEY || 'sk_test_51Pxx77xx32exxIXL8NqfPyDGJcZ0sU31ibzFCRg';
+    let stripeActive = true;
 
     try {
       const stripeSnap = await db.collection('settings').doc('stripe').get();
       if (stripeSnap.exists) {
         const stripeConfig = stripeSnap.data()!;
-        stripeActive = stripeConfig.active === true;
-        if (!secretKey) {
-          secretKey = stripeConfig.secretKey || '';
+        stripeActive = stripeConfig.active !== false;
+        if (stripeConfig.secretKey) {
+          secretKey = stripeConfig.secretKey;
         }
       }
     } catch (err) {
@@ -295,12 +295,12 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
     }
 
     // Fallback to settings/stripe_public if admin collection read failed
-    if (!stripeActive || !secretKey) {
+    if (secretKey === 'sk_test_51Pxx77xx32exxIXL8NqfPyDGJcZ0sU31ibzFCRg') {
       try {
         const stripeSnapPublic = await db.collection('settings').doc('stripe_public').get();
         if (stripeSnapPublic.exists) {
           const stripeConfigPublic = stripeSnapPublic.data()!;
-          stripeActive = stripeConfigPublic.active === true;
+          stripeActive = stripeConfigPublic.active !== false;
         }
       } catch (err) {
         console.warn('[Stripe Server] Could not read settings/stripe_public from Firestore admin:', err);

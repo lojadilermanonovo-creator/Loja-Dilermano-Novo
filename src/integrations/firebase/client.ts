@@ -6,6 +6,22 @@ import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import firebaseAppletConfig from '../../../firebase-applet-config.json';
 
+const getSanitizedDatabaseId = (): string => {
+  const envId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
+  if (!envId || envId.includes("(default)") || envId === "undefined") {
+    return firebaseAppletConfig.firestoreDatabaseId || "ai-studio-1d17aef0-f9e2-48aa-bbba-ff95554e5700";
+  }
+  if (envId.includes("=")) {
+    const parts = envId.split("=");
+    const cleaned = parts[parts.length - 1].trim();
+    if (cleaned === "(default)" || cleaned === "default") {
+      return firebaseAppletConfig.firestoreDatabaseId || "ai-studio-1d17aef0-f9e2-48aa-bbba-ff95554e5700";
+    }
+    return cleaned;
+  }
+  return envId;
+};
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseAppletConfig.apiKey,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseAppletConfig.authDomain,
@@ -13,9 +29,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseAppletConfig.storageBucket,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseAppletConfig.messagingSenderId,
   appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseAppletConfig.appId,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID && import.meta.env.VITE_FIREBASE_DATABASE_ID !== "(default)"
-    ? import.meta.env.VITE_FIREBASE_DATABASE_ID 
-    : (firebaseAppletConfig.firestoreDatabaseId || "ai-studio-1d17aef0-f9e2-48aa-bbba-ff95554e5700"),
+  firestoreDatabaseId: getSanitizedDatabaseId(),
 };
 
 console.log("Firebase Init - config details:", {

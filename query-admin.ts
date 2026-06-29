@@ -2,8 +2,10 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 async function run() {
-  console.log("Initializing Firebase Admin with auto-discovery...");
-  initializeApp();
+  console.log("Initializing Firebase Admin with explicit projectId...");
+  initializeApp({
+    projectId: "gen-lang-client-0387723123"
+  });
 
   const db = getFirestore("ai-studio-1d17aef0-f9e2-48aa-bbba-ff95554e5700");
 
