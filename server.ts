@@ -9,7 +9,7 @@ import Stripe from 'stripe';
 const appAdmin = getApps().length === 0 
   ? initializeApp({ projectId: "gen-lang-client-0387723123" }) 
   : getApp();
-const db = getFirestore("ai-studio-1d17aef0-f9e2-48aa-bbba-ff95554e5700");
+const db = getFirestore(appAdmin, "ai-studio-1d17aef0-f9e2-48aa-bbba-ff95554e5700");
 
 const app = express();
 const PORT = 3000;

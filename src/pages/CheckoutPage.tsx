@@ -815,7 +815,9 @@ export default function CheckoutPage() {
             </Button>
             
             <p className="text-[10px] text-center text-slate-400">
-              Ao clicar em finalizar, você verá a chave PIX e as instruções para conclusão do seu pagamento.
+              {paymentMethod === 'stripe'
+                ? 'Ao clicar em finalizar, você será redirecionado com total segurança para o Stripe Checkout para pagar com Cartão de Crédito.'
+                : 'Ao clicar em finalizar, você verá a chave PIX e as instruções para conclusão do seu pagamento.'}
             </p>
           </section>
         </div>
